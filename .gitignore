@@ -1,0 +1,10 @@
+node_modules/
+dist/
+coverage/
+.venv-ci/
+.env
+.env.*
+!.env.example
+.phase1-test-*/
+.phase2-test-*/
+.phase3-test-*/
