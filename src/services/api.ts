@@ -1,62 +1,55 @@
-import type { Result } from "../shared/errors";
-
 const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3000/api";
 
+export type Result<T> =
+  | { ok: true; data: T }
+  | { ok: false; error: { code: string; message: string; retryable?: boolean } };
+
 async function request<T>(path: string, init: RequestInit = {}): Promise<Result<T>> {
-  const response = await fetch(`${BASE_URL}${path}`, {
-    headers: {
-      "Content-Type": "application/json",
-      ...init.headers,
-    },
-    ...init,
-  });
-
-  const text = await response.text();
-  let data: unknown;
-
   try {
-    data = JSON.parse(text);
-  } catch {
-    return { ok: false, error: { code: "VALIDATION_ERROR", message: "Respuesta no es JSON válido", retryable: false } };
-  }
+    const response = await fetch(`${BASE_URL}${path}`, {
+      headers: {
+        "Content-Type": "application/json",
+        ...init.headers,
+      },
+      ...init,
+    });
 
-  const result = await import("../shared/contracts.js").then((mod) => mod.resultSchema(data));
-  
-  // resultSchema returns a function that validates, but we need to check the shape
-  // Actually resultSchema takes data and returns a function, let me check usage
-  // From contracts.ts: export function resultSchema<T extends z.ZodType>(data: T) { ... }
-  // It returns a function that you call with data to validate... actually looking at line 39-44:
-  // It returns a validated result object directly? No, looking at it again:
-  // The function resultSchema takes data (a ZodType) and returns... actually it's confusing.
-  // Let me re-read: `export function resultSchema<T extends z.ZodType>(data: T)` - data is a ZodType
-  // And it returns a discriminated union... Actually wait, it takes the ZodType as parameter and returns... 
-  // A function? Let me check usage. In errors.ts: `captureResult` uses `success` and `failure`.
-  // In contracts the function is used to validate data shaped according to Result<T>.
-  
-  // Actually I need to just check if data.ok exists
-  if (typeof data === "object" && data !== null && "ok" in data) {
-    return data as Result<T>;
-  }
+    const text = await response.text();
+    let data: any;
 
-  // If the backend returns Result<T>, it should have ok field
-  if (typeof data === "object" && data !== null && "ok" in (data as any)) {
-    const typed = data as { ok: boolean; error?: { code: string; message: string } };
-    if (!typed.ok) {
-      return { ok: false, error: { code: typed.error?.code || "UNKNOWN_ERROR", message: typed.error?.message || "Unknown error", retryable: false } };
+    try {
+      data = JSON.parse(text);
+    } catch {
+      return { ok: false, error: { code: "VALIDATION_ERROR", message: "Respuesta no es JSON válido", retryable: false } };
     }
-    return { ok: true, data: typed.data as T };
-  }
 
-  return { ok: false, error: { code: "VALIDATION_ERROR", message: "Formato de respuesta inesperado", retryable: false } };
+    if (typeof data === "object" && data !== null) {
+      if ("ok" in data && !data.ok) {
+        return {
+          ok: false,
+          error: {
+            code: data.error?.code || "UNKNOWN_ERROR",
+            message: data.error?.message || "Error desconocido en la respuesta del servidor",
+            retryable: false,
+          },
+        };
+      }
+      return { ok: true, data: (data.data !== undefined ? data.data : data) as T };
+    }
+
+    return { ok: false, error: { code: "VALIDATION_ERROR", message: "Formato de respuesta inesperado", retryable: false } };
+  } catch (err: any) {
+    return { ok: false, error: { code: "NETWORK_ERROR", message: err.message || "Error de conexión con el servidor", retryable: true } };
+  }
 }
 
 export const api = {
-  // Gestión de Proyectos y Persistencia (HU-29, HU-30)
+  // Gestión de Proyectos y Persistencia
   getProjects: () => request<{ projects: any[] }>("/projects"),
   getAuditHistory: (projectId: string) => request(`/audit-history?projectId=${projectId}`),
   getHealthStatus: () => request<{ ok: boolean; healthy: boolean; details?: any }>("/health"),
 
-  // Analizador Estático y AST (HU-04, HU-05, HU-06)
+  // Analizador Estático y AST
   readFileContext: (path: string, startLine?: number, endLine?: number) =>
     request<{ path: string; content: string; startLine: number; endLine: number; fileHash: string; truncated: boolean }>("/analyzer/read-file-context", {
       method: "POST",
@@ -73,7 +66,7 @@ export const api = {
       body: JSON.stringify({ path, line }),
     }),
 
-  // Ejecutor de Pruebas & Verificación (HU-12, HU-13, HU-14)
+  // Ejecutor de Pruebas & Verificación
   runTests: (runner: "jest" | "pytest", targets?: string[], timeoutMs?: number) =>
     request<{ runId: string; runner: string; status: string; exitCode?: number; durationMs: number; summary: any; cases: any[]; stdout: string; stderr: string; truncated: boolean; complete: boolean; startedAt: string; finishedAt: string; workspaceStateHash: string; configurationHash: string }>("/runner/tests", {
       method: "POST",
@@ -85,7 +78,7 @@ export const api = {
       body: JSON.stringify({ baselineRunId, candidateRunId }),
     }),
 
-  // Controlador Git & Parches (HU-08, HU-09, HU-10, HU-11)
+  // Controlador Git & Parches
   getGitStatus: () => request<{ branch: string | null; headCommit?: string; clean: boolean; staged: string[]; modified: string[]; untracked: string[]; conflicted: string[] }>("/git/status"),
   createFixBranch: (slug: string, expectedHead: string) =>
     request<{ sessionId: string; branch: string; baseBranch: string; baseCommit: string }>("/git/create-fix-branch", {
@@ -113,7 +106,7 @@ export const api = {
       body: JSON.stringify({ sessionId, attemptId }),
     }),
 
-  // Auditoría, Hooks y Subagentes (HU-27, HU-28)
+  // Auditoría, Hooks y Subagentes
   getHooksAuditLogs: () => request<{ logs: any[]; total: number }>("/audit/hooks"),
   getSubagentsStatus: () => request<{ agents: any[]; online: boolean }>("/agents/status"),
 };

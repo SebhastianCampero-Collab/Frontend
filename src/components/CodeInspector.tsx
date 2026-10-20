@@ -19,6 +19,10 @@ interface CodeSymbol {
   kind: "function" | "method" | "class" | "interface" | "type" | "variable" | "module";
   signature: string;
   range: { start: { line: number; column: number }; end: { line: number; column: number } };
+  references?: Array<{
+    path: string;
+    range: { start: { line: number; column: number }; end: { line: number; column: number } };
+  }>;
 }
 
 interface Dependency {
@@ -29,11 +33,23 @@ interface Dependency {
   typeOnly?: boolean;
 }
 
-export function CodeInspector() {
+type ResultType = {
+  ok: boolean;
+  data?: unknown;
+  error?: { code: string; message: string; retryable?: boolean; details?: unknown };
+};
+
+interface CodeInspectorProps {
+  onResult?: (result: ResultType) => void;
+  backendOk?: boolean;
+}
+
+export function CodeInspector({ onResult, backendOk }: CodeInspectorProps) {
   const [mode, setMode] = useState<"readFile" | "analyze" | "symbol">("readFile");
   const [filePath, setFilePath] = useState<string>("");
   const [startLine, setStartLine] = useState<number>(1);
   const [endLine, setEndLine] = useState<number>(50);
+  const [, setTruncated] = useState<boolean>(false);
   const [checks, setChecks] = useState<CheckType[]>(["syntax"]);
   const [symbolPath, setSymbolPath] = useState<string>("");
   const [symbolLine, setSymbolLine] = useState<number>(1);
@@ -52,10 +68,15 @@ export function CodeInspector() {
     try {
       if (mode === "readFile") {
         const result = await api.readFileContext(filePath, startLine, endLine);
+        if (onResult) onResult(result);
         if (!result.ok) throw new Error(result.error?.message || "Error desconocido");
-        setError(undefined);
+        setFilePath(result.data.path);
+        setStartLine(result.data.startLine);
+        setEndLine(result.data.endLine);
+        setTruncated(result.data.truncated);
       } else if (mode === "analyze") {
         const result = await api.analyzeCode([filePath], checks);
+        if (onResult) onResult(result);
         if (!result.ok) throw new Error(result.error?.message || "Error desconocido");
         setDiagnostics(
           result.data.diagnostics.map((d: any) => ({
@@ -93,6 +114,7 @@ export function CodeInspector() {
         setAnalyzedFiles(result.data.analyzedFiles);
       } else if (mode === "symbol") {
         const result = await api.getSymbolContext(symbolPath, symbolLine);
+        if (onResult) onResult(result);
         if (!result.ok) throw new Error(result.error?.message || "Error desconocido");
         setSelectedSymbol({
           path: result.data.symbol.path,
@@ -103,6 +125,7 @@ export function CodeInspector() {
             start: { line: result.data.symbol.range.start.line, column: result.data.symbol.range.start.column },
             end: { line: result.data.symbol.range.end.line, column: result.data.symbol.range.end.column },
           },
+          references: result.data.symbol.references,
         });
         setDependencies(
           result.data.imports.map((imp: any) => ({
@@ -124,34 +147,46 @@ export function CodeInspector() {
 
   return (
     <div className="space-y-6">
-      <div className="border-b border-gray-700 bg-gray-900/50 px-4 py-3 flex gap-2">
+      {backendOk === false && (
+        <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-3 text-amber-400 text-xs">
+          Nota: El servicio de backend no responde o está fuera de línea.
+        </div>
+      )}
+
+      <div className="border-b border-gray-700 bg-gray-900/50 px-4 py-3 flex gap-2 rounded-t-lg">
         <button
           onClick={() => setMode("readFile")}
-          className={mode === "readFile"
-            ? "bg-indigo-600 text-white px-4 py-2 rounded-lg font-medium"
-            : "text-gray-300 hover:text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors"}
+          className={
+            mode === "readFile"
+              ? "bg-indigo-600 text-white px-4 py-2 rounded-lg font-medium text-sm"
+              : "text-gray-300 hover:text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors text-sm"
+          }
         >
           Lectura de Archivo
         </button>
         <button
           onClick={() => setMode("analyze")}
-          className={mode === "analyze"
-            ? "bg-indigo-600 text-white px-4 py-2 rounded-lg font-medium"
-            : "text-gray-300 hover:text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors"}
+          className={
+            mode === "analyze"
+              ? "bg-indigo-600 text-white px-4 py-2 rounded-lg font-medium text-sm"
+              : "text-gray-300 hover:text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors text-sm"
+          }
         >
           Análisis AST ({checks.length > 0 ? checks.join(", ") : "ningún check"})
         </button>
         <button
           onClick={() => setMode("symbol")}
-          className={mode === "symbol"
-            ? "bg-indigo-600 text-white px-4 py-2 rounded-lg font-medium"
-            : "text-gray-300 hover:text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors"}
+          className={
+            mode === "symbol"
+              ? "bg-indigo-600 text-white px-4 py-2 rounded-lg font-medium text-sm"
+              : "text-gray-300 hover:text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors text-sm"
+          }
         >
           Contexto de Símbolo
         </button>
       </div>
 
-      <div className="bg-gray-900/50 rounded-lg p-4">
+      <div className="bg-gray-900/50 rounded-lg p-4 border border-gray-800">
         {mode === "readFile" && (
           <div>
             <div className="flex gap-2 mb-3">
@@ -160,11 +195,11 @@ export function CodeInspector() {
                 value={filePath}
                 onChange={(e) => setFilePath(e.target.value)}
                 placeholder="Ruta del archivo..."
-                className="bg-gray-800 border border-gray-600 rounded-md px-3 py-2 w-40 text-sm focus:outline-none focus:border-indigo-500"
+                className="bg-gray-800 border border-gray-600 rounded-md px-3 py-2 w-64 text-sm focus:outline-none focus:border-indigo-500 text-white"
               />
               <button
                 onClick={loadContent}
-                className="px-4 py-2 bg-indigo-600 text-white rounded-md font-medium hover:bg-indigo-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-4 py-2 bg-indigo-600 text-white rounded-md font-medium text-sm hover:bg-indigo-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 disabled={isLoading}
               >
                 {isLoading ? "Cargando..." : "Analizar"}
@@ -173,7 +208,7 @@ export function CodeInspector() {
 
             {isLoading && <p className="text-sm text-gray-400">Cargando contenido...</p>}
 
-            {!isLoading && !error && (
+            {!isLoading && !error && filePath && (
               <div className="mt-4 space-y-3 text-sm">
                 <p className="font-medium text-gray-200">Archivo: {filePath}</p>
                 <p className="font-medium text-gray-200">Línea {startLine} - {endLine}</p>
@@ -193,9 +228,11 @@ export function CodeInspector() {
             <div className="flex gap-2 mb-3">
               <select
                 multiple
-                onChange={(e) => setChecks(Array.from(e.target.selectedOptions).map((o: any) => o.value as CheckType))}
-                className="bg-gray-800 border border-gray-600 rounded-md px-2 py-1 text-xs focus:outline-none focus:border-indigo-500"
-                style={{ height: "auto" }}
+                value={checks}
+                onChange={(e) =>
+                  setChecks(Array.from(e.target.selectedOptions).map((o: any) => o.value as CheckType))
+                }
+                className="bg-gray-800 border border-gray-600 rounded-md px-2 py-1 text-xs text-white focus:outline-none focus:border-indigo-500"
               >
                 <option value="syntax">Sintaxis</option>
                 <option value="semantic">Semántica</option>
@@ -203,7 +240,7 @@ export function CodeInspector() {
               </select>
               <button
                 onClick={loadContent}
-                className="px-4 py-2 bg-indigo-600 text-white rounded-md font-medium hover:bg-indigo-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-4 py-2 bg-indigo-600 text-white rounded-md font-medium text-sm hover:bg-indigo-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 disabled={isLoading}
               >
                 {isLoading ? "Analizando..." : "Ejecutar análisis"}
@@ -217,21 +254,29 @@ export function CodeInspector() {
                 {diagnostics.map((d: Diagnostic, i: number) => (
                   <div
                     key={i}
-                    className={d.severity === "error"
-                      ? "bg-red-600/30 border-l-4 border-red-500"
-                      : d.severity === "warning"
-                        ? "bg-yellow-600/30 border-l-4 border-yellow-500"
-                        : "bg-green-600/30 border-l-4 border-green-500"
+                    className={
+                      d.severity === "error"
+                        ? "bg-red-600/30 border-l-4 border-red-500 p-3 rounded"
+                        : d.severity === "warning"
+                          ? "bg-yellow-600/30 border-l-4 border-yellow-500 p-3 rounded"
+                          : "bg-green-600/30 border-l-4 border-green-500 p-3 rounded"
                     }
                   >
                     <div className="flex justify-between items-start mb-1">
-                      <span className={`font-medium text-white ${d.severity === "error" ? "text-red-400" : d.severity === "warning" ? "text-yellow-400" : "text-green-400"}`}>
+                      <span
+                        className={`font-medium text-sm ${d.severity === "error"
+                            ? "text-red-400"
+                            : d.severity === "warning"
+                              ? "text-yellow-400"
+                              : "text-green-400"
+                          }`}
+                      >
                         {d.code} - {d.severity}
                       </span>
-                      <span className="text-xs text-gray-500">{d.path}</span>
+                      <span className="text-xs text-gray-400">{d.path}</span>
                     </div>
-                    <p className="text-gray-300 text-truncate line-clamp-3">{d.message}</p>
-                    {d.range?.start.line > 0 && (
+                    <p className="text-gray-300 text-sm line-clamp-3">{d.message}</p>
+                    {d.range && d.range.start.line > 0 && (
                       <p className="text-xs text-gray-500 mt-1">
                         Línea {d.range.start.line}:{d.range.start.column} - {d.range.end.line}:{d.range.end.column}
                       </p>
@@ -241,7 +286,7 @@ export function CodeInspector() {
               </div>
             )}
 
-            {diagnostics.length === 0 && affectedSymbols.length === 0 && (
+            {!isLoading && diagnostics.length === 0 && affectedSymbols.length === 0 && (
               <p className="text-sm text-gray-500 mt-4">No se encontraron diagnósticos con los checks seleccionados.</p>
             )}
 
@@ -249,7 +294,7 @@ export function CodeInspector() {
               <div className="mt-4 space-y-3 max-h-64 overflow-y-auto">
                 {affectedSymbols.map((s: CodeSymbol, i: number) => (
                   <div key={i} className="p-3 rounded-lg bg-gray-800/50 border border-gray-600">
-                    <div className="font-medium text-white">{s.name}</div>
+                    <div className="font-medium text-white text-sm">{s.name}</div>
                     <p className="text-xs text-gray-400 mt-1">{s.signature}</p>
                     <p className="text-xs text-gray-500 mt-1">
                       Línea {s.range.start.line}:{s.range.start.column} - {s.range.end.line}:{s.range.end.column}
@@ -264,7 +309,12 @@ export function CodeInspector() {
                 {dependencies.map((d: Dependency, i: number) => (
                   <div key={i} className="p-2 rounded bg-gray-700 text-xs">
                     <span className="font-mono text-gray-300">{d.from}</span>
-                    <span className="ml-2">{d.specifier}{d.resolvedPath ? ` → ${d.resolvedPath}` : ""}{d.external ? " (external)" : ""}{d.typeOnly ? " (type-only)" : ""}</span>
+                    <span className="ml-2">
+                      {d.specifier}
+                      {d.resolvedPath ? ` → ${d.resolvedPath}` : ""}
+                      {d.external ? " (external)" : ""}
+                      {d.typeOnly ? " (type-only)" : ""}
+                    </span>
                   </div>
                 ))}
               </div>
@@ -284,65 +334,72 @@ export function CodeInspector() {
                 value={symbolPath}
                 onChange={(e) => setSymbolPath(e.target.value)}
                 placeholder="Ruta del archivo..."
-                className="bg-gray-800 border border-gray-600 rounded-md px-3 py-2 w-40 text-sm focus:outline-none focus:border-indigo-500"
+                className="bg-gray-800 border border-gray-600 rounded-md px-3 py-2 w-40 text-sm focus:outline-none focus:border-indigo-500 text-white"
               />
               <input
                 type="number"
                 value={symbolLine}
                 onChange={(e) => setSymbolLine(Number(e.target.value))}
                 min="1"
-                placeholder="Número de línea"
-                className="bg-gray-800 border border-gray-600 rounded-md px-3 py-2 w-24 text-sm focus:outline-none focus:border-indigo-500 ml-3"
+                placeholder="Línea"
+                className="bg-gray-800 border border-gray-600 rounded-md px-3 py-2 w-24 text-sm focus:outline-none focus:border-indigo-500 text-white ml-2"
               />
               <button
                 onClick={loadContent}
-                className="px-4 py-2 bg-indigo-600 text-white rounded-md font-medium hover:bg-indigo-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-4 py-2 bg-indigo-600 text-white rounded-md font-medium text-sm hover:bg-indigo-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed ml-2"
                 disabled={isLoading}
               >
                 {isLoading ? "Cargando..." : "Obtener contexto"}
               </button>
             </div>
 
-            {isLoading && <p className="text-sm text-gray-400 mt-4">Cargando contexto de símbolo...</p>}
+            {isLoading && <p className="text-sm text-gray-400 mt-4">Buscando contexto de símbolo...</p>}
 
-            {isLoading && !error && selectedSymbol && (
+            {!isLoading && selectedSymbol && (
               <div className="mt-4 space-y-4">
                 <div>
                   <p className="font-medium text-white">Símbolo: {selectedSymbol.name}</p>
-                  <p className="text-gray-400">Tipo: {selectedSymbol.kind}</p>
-                  <p className="text-gray-400 mt-1">{selectedSymbol.signature}</p>
-                  <p className="text-gray-500 text-truncate line-clamp-2">
+                  <p className="text-xs text-gray-400">Tipo: {selectedSymbol.kind}</p>
+                  <p className="text-xs text-gray-400 mt-1">{selectedSymbol.signature}</p>
+                  <p className="text-xs text-gray-500 mt-1">
                     Ubicación: Línea {selectedSymbol.range.start.line}:{selectedSymbol.range.start.column} - {selectedSymbol.range.end.line}:{selectedSymbol.range.end.column}
                   </p>
                 </div>
 
                 {dependencies.length > 0 && (
                   <div>
-                    <p className="font-medium text-white">Importaciones ({dependencies.length})</p>
+                    <p className="font-medium text-white text-sm">Importaciones ({dependencies.length})</p>
                     <div className="mt-2 space-y-2 max-h-48 overflow-y-auto">
                       {dependencies.map((d: any, i: number) => (
                         <div key={i} className="p-2 rounded bg-gray-700 text-xs">
                           <span className="font-mono text-gray-300">{d.from}</span>
-                          <span>{d.specifier}{d.resolvedPath ? ` → ${d.resolvedPath}` : ""}{d.external ? " (external)" : ""}{d.typeOnly ? " (type-only)" : ""}</span>
+                          <span>
+                            {d.specifier}
+                            {d.resolvedPath ? ` → ${d.resolvedPath}` : ""}
+                            {d.external ? " (external)" : ""}
+                            {d.typeOnly ? " (type-only)" : ""}
+                          </span>
                         </div>
-                      ))
+                      ))}
                     </div>
                   </div>
                 )}
 
-                {selectedSymbol.references?.length > 0 && (
+                {selectedSymbol.references && selectedSymbol.references.length > 0 && (
                   <div>
-                    <p className="font-medium text-white">Referencias ({selectedSymbol.references.length})</p>
+                    <p className="font-medium text-white text-sm">Referencias ({selectedSymbol.references.length})</p>
                     <div className="mt-2 space-y-2 max-h-48 overflow-y-auto">
                       {selectedSymbol.references.map((ref: any, i: number) => (
                         <div key={i} className="p-2 rounded bg-gray-700 text-xs">
                           <span className="font-mono text-gray-300">{ref.path}</span>
-                          <span className="text-xs block mt-1">Línea {ref.range.start.line}:{ref.range.start.column} - {ref.range.end.line}:{ref.range.end.column}</span>
+                          <span className="text-xs block mt-1">
+                            Línea {ref.range.start.line}:{ref.range.start.column} - {ref.range.end.line}:{ref.range.end.column}
+                          </span>
                         </div>
-                      ))
+                      ))}
                     </div>
                   </div>
-                )} 
+                )}
               </div>
             )}
 
@@ -351,8 +408,6 @@ export function CodeInspector() {
                 <p className="text-red-400 text-sm">Error: {error}</p>
               </div>
             )}
-
-            {!selectedSymbol && isLoading && <p className="text-sm text-gray-400 mt-4">Buscando contexto de símbolo...</p>}
           </div>
         )}
       </div>

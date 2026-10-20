@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Header } from "./components/Header";
 import { CodeInspector } from "./components/CodeInspector";
 import { TestRunnerView } from "./components/TestRunnerView";
@@ -15,8 +15,8 @@ type ResultType = {
 const DEFAULT_API_URL = "http://localhost:3000/api";
 
 const initialState = {
-  selectedTab: "code-inspector" as const,
-  resultDrawer: { visible: false, result: {} as ResultType, onClose: () => {} },
+  selectedTab: "code-inspector" as "code-inspector" | "test-runner" | "git-control" | "agent-monitor",
+  resultDrawer: { visible: false, result: {} as ResultType, onClose: () => { } },
   backendOk: false,
 };
 
@@ -24,34 +24,48 @@ type AppState = typeof initialState;
 
 export default function App() {
   const [state, setState] = useState<AppState>(initialState);
-  const [apiUrl, setApiUrl] = useState<string>(import.meta.env.VITE_API_URL || DEFAULT_API_URL);
+  const [, setApiUrl] = useState<string>((import.meta as any).env?.VITE_API_URL || DEFAULT_API_URL);
 
   // Verificar salud del backend al montar
   useEffect(() => {
-    fetch(`${apiUrl}/health`)
+    const activeApiUrl = (import.meta as any).env?.VITE_API_URL || DEFAULT_API_URL;
+    setApiUrl(activeApiUrl);
+
+    fetch(`${activeApiUrl}/health`)
       .then((res) => res.json())
       .then((data) => {
         setState((s) => ({ ...s, backendOk: data.ok === true }));
       })
       .catch(() => setState((s) => ({ ...s, backendOk: false })));
-  }, [apiUrl]);
+  }, []);
 
   const openResultDrawer = (result: ResultType) => {
     setState((s) => ({
       ...s,
-      resultDrawer: { visible: true, result, onClose: () => setState((s2) => ({ ...s2, resultDrawer: { visible: false, result: {} as ResultType, onClose: () => {} } })) },
+      resultDrawer: {
+        visible: true,
+        result,
+        onClose: () =>
+          setState((s2) => ({
+            ...s2,
+            resultDrawer: { visible: false, result: {} as ResultType, onClose: () => { } },
+          })),
+      },
     }));
   };
 
   const closeResultDrawer = () =>
-    setState((s) => ({ ...s, resultDrawer: { visible: false, result: {} as ResultType, onClose: () => {} } }));
+    setState((s) => ({
+      ...s,
+      resultDrawer: { visible: false, result: {} as ResultType, onClose: () => { } },
+    }));
 
   const tabs = [
     { key: "code-inspector", label: "Inspector Código & AST" },
     { key: "test-runner", label: "Runner Pruebas" },
     { key: "git-control", label: "Control Git & Diffs" },
     { key: "agent-monitor", label: "Monitor Agentes" },
-  ];
+  ] as const;
 
   return (
     <div className="min-h-screen bg-gray-950 text-white font-sans">
@@ -60,18 +74,21 @@ export default function App() {
 
       {/* Main content area */}
       <main className="max-w-7xl mx-auto p-4">
-        {/* Tabs navigation - wrapped in single div to avoid adjacent JSX */}
-        <div className="bg-gray-900/50 rounded-lg mb-6 overflow-x-auto">
+        {/* Tabs navigation */}
+        <div className="bg-gray-900/50 rounded-lg mb-6 overflow-x-auto border border-gray-800">
           <div className="flex border-b border-gray-700">
             {tabs.map((tab) => (
-              <div
+              <button
                 key={tab.key}
-                className={state.selectedTab === tab.key.key
-                  ? "flex-1 bg-indigo-600 text-white px-4 py-2 rounded-l-lg border-b-2 border-indigo-600 font-medium"
-                  : "flex-1 text-gray-300 hover:text-white px-4 py-2 rounded-l-lg hover:bg-gray-700 border-b-2 border-transparent transition-colors"}
+                onClick={() => setState((s) => ({ ...s, selectedTab: tab.key }))}
+                className={
+                  state.selectedTab === tab.key
+                    ? "flex-1 bg-indigo-600 text-white px-4 py-3 font-medium transition-colors text-sm text-center"
+                    : "flex-1 text-gray-300 hover:text-white px-4 py-3 hover:bg-gray-800 transition-colors text-sm text-center"
+                }
               >
                 {tab.label}
-              </div>
+              </button>
             ))}
           </div>
         </div>

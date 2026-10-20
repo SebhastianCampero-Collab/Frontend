@@ -13,45 +13,27 @@ interface GitStatus {
   conflicted: string[];
 }
 
-interface GitCreateFixBranchOutput {
-  sessionId: string;
-  branch: FixBranch;
-  baseBranch: string;
-  baseCommit: string | null;
+type ResultType = {
+  ok: boolean;
+  data?: unknown;
+  error?: { code: string; message: string; retryable?: boolean; details?: unknown };
+};
+
+interface GitControlProps {
+  onResult?: (result: ResultType) => void;
+  backendOk?: boolean;
 }
 
-interface GitBeginAttemptOutput {
-  attemptId: string;
-  checkpointCommit: string | null;
-}
-
-interface GitApplyPatchOutput {
-  applied: boolean;
-  changedFiles: string[];
-  diffHash: string;
-}
-
-interface GitCommitFixOutput {
-  commit: string;
-  branch: FixBranch;
-  files: string[];
-}
-
-interface GitRollbackAttemptOutput {
-  restoredCommit: string | null;
-  revertedFiles: string[];
-  branch: FixBranch;
-  clean: boolean;
-}
-
-export function GitControlView() {
+export function GitControlView({ onResult, backendOk }: GitControlProps) {
   const [status, setStatus] = useState<GitStatus | null>(null);
   const [sessionId, setSessionId] = useState<string>("");
   const [attemptId, setAttemptId] = useState<string>("");
   const [checkpointCommit, setCheckpointCommit] = useState<string | null>(null);
   const [fixBranch, setFixBranch] = useState<FixBranch>("fix/temp");
+  const [, setBaseBranch] = useState<string>("");
+  const [, setBaseCommit] = useState<string | null>(null);
   const [unifiedDiff, setUnifiedDiff] = useState<string>("");
-  const [expectedFileHashes, setExpectedFileHashes] = useState<Record<string, string | null>>({});
+  const [expectedFileHashes] = useState<Record<string, string | null>>({});
   const [commitMessage, setCommitMessage] = useState<string>("");
   const [expectedDiffHash, setExpectedDiffHash] = useState<string>("");
   const [verificationRunId, setVerificationRunId] = useState<string>("");
@@ -59,7 +41,7 @@ export function GitControlView() {
   const [rollbackAttemptId, setRollbackAttemptId] = useState<string>("");
   const [applied, setApplied] = useState<boolean | null>(null);
   const [diffHash, setDiffHash] = useState<string>("");
-  const [changedFiles, setChangedFiles] = useState<string[]>([]);
+  const [, setChangedFiles] = useState<string[]>([]);
   const [restoredCommit, setRestoredCommit] = useState<string | null>(null);
   const [revertedFiles, setRevertedFiles] = useState<string[]>([]);
   const [rollbackClean, setRollbackClean] = useState<boolean | null>(null);
@@ -71,6 +53,7 @@ export function GitControlView() {
   const fetchGitStatus = async () => {
     try {
       const result = await api.getGitStatus();
+      if (onResult) onResult(result);
       if (!result.ok) throw new Error(result.error?.message || "Error desconocido");
       setStatus(result.data);
     } catch (e: any) {
@@ -81,10 +64,11 @@ export function GitControlView() {
   const handleCreateFixBranch = async () => {
     try {
       const result = await api.createFixBranch(fixBranch, status?.branch ?? "main");
+      if (onResult) onResult(result);
       if (!result.ok) throw new Error(result.error?.message || "Error desconocido");
       const data = result.data;
       setSessionId(data.sessionId);
-      setFixBranch(data.branch);
+      setFixBranch(data.branch as FixBranch);
       setBaseBranch(data.baseBranch);
       setBaseCommit(data.baseCommit);
       alert(`Rama creada: ${data.branch}\nSession: ${data.sessionId}`);
@@ -96,6 +80,7 @@ export function GitControlView() {
   const handleBeginAttempt = async () => {
     try {
       const result = await api.beginAttempt(sessionId);
+      if (onResult) onResult(result);
       if (!result.ok) throw new Error(result.error?.message || "Error desconocido");
       const data = result.data;
       setAttemptId(data.attemptId);
@@ -109,6 +94,7 @@ export function GitControlView() {
   const handleApplyPatch = async () => {
     try {
       const result = await api.applyPatch(sessionId, attemptId, unifiedDiff, expectedFileHashes);
+      if (onResult) onResult(result);
       if (!result.ok) throw new Error(result.error?.message || "Error desconocido");
       const data = result.data;
       setApplied(data.applied);
@@ -123,6 +109,7 @@ export function GitControlView() {
   const handleCommitFix = async () => {
     try {
       const result = await api.commitFix(sessionId, attemptId, commitMessage, expectedDiffHash, verificationRunId);
+      if (onResult) onResult(result);
       if (!result.ok) throw new Error(result.error?.message || "Error desconocido");
       const data = result.data;
       alert(`Commit confirmado:\n${data.commit}\nRama: ${data.branch}\nArchivos: ${data.files.join(", ")}`);
@@ -134,6 +121,7 @@ export function GitControlView() {
   const handleRollback = async () => {
     try {
       const result = await api.rollbackAttempt(rollbackBranch, rollbackAttemptId);
+      if (onResult) onResult(result);
       if (!result.ok) throw new Error(result.error?.message || "Error desconocido");
       const data = result.data;
       setRestoredCommit(data.restoredCommit);
@@ -147,48 +135,54 @@ export function GitControlView() {
 
   return (
     <div className="space-y-6">
+      {backendOk === false && (
+        <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-3 text-amber-400 text-xs">
+          Nota: El servicio de backend no responde o está fuera de línea.
+        </div>
+      )}
+
       {/* Estado Git actual */}
-      <div className="bg-gray-900/50 rounded-lg p-4">
-        <p className="font-medium text-white mb-3">Estado Actual de Git</p>
+      <div className="bg-gray-900/50 rounded-lg p-4 border border-gray-800">
+        <p className="font-medium text-white mb-3 text-sm">Estado Actual de Git</p>
         {status ? (
-          <div className="grid grid-cols-2 gap-3 text-sm">
-            <div>
-              <p className="font-semibold text-gray-300">Rama</p>
-              <p className="font-medium text-white">{status.branch || "Ninguna"}</p>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+            <div className="bg-gray-800/40 p-3 rounded border border-gray-700/60">
+              <p className="font-semibold text-gray-300 text-xs">Rama</p>
+              <p className="font-medium text-white mt-1 text-sm">{status.branch || "Ninguna"}</p>
             </div>
-            <div>
-              <p className="font-semibold text-gray-300">HEAD Commit</p>
-              <p className="font-medium text-white">{status.headCommit || "Ninguno"}</p>
+            <div className="bg-gray-800/40 p-3 rounded border border-gray-700/60">
+              <p className="font-semibold text-gray-300 text-xs">HEAD Commit</p>
+              <p className="font-medium text-white mt-1 text-sm truncate">{status.headCommit || "Ninguno"}</p>
             </div>
-            <div>
-              <p className="font-semibold text-gray-300">Clean</p>
-              <p className={`font-medium ${status.clean ? "text-green-400" : "text-red-400"}`}>{status.clean ? "Sí" : "No"}</p>
+            <div className="bg-gray-800/40 p-3 rounded border border-gray-700/60">
+              <p className="font-semibold text-gray-300 text-xs">Clean</p>
+              <p className={`font-medium mt-1 text-sm ${status.clean ? "text-green-400" : "text-red-400"}`}>{status.clean ? "Sí" : "No"}</p>
             </div>
-            <div>
-              <p className="font-semibold text-gray-300">Modified</p>
-              <p className="text-gray-300">{status.modified.length > 0 ? status.modified.join(", ") : "Ninguno"}</p>
+            <div className="bg-gray-800/40 p-3 rounded border border-gray-700/60">
+              <p className="font-semibold text-gray-300 text-xs">Modified</p>
+              <p className="text-gray-300 mt-1 text-sm truncate">{status.modified.length > 0 ? status.modified.join(", ") : "Ninguno"}</p>
             </div>
           </div>
         ) : (
-          <p className="text-gray-500">Cargando estado...</p>
+          <p className="text-gray-500 text-sm">Cargando estado...</p>
         )}
       </div>
 
       {/* Sección: Crear rama fix */}
-      <div>
-        <p className="font-medium text-white">Crear rama fix/...</p>
-        <div className="flex gap-2 mb-3">
+      <div className="bg-gray-900/50 rounded-lg p-4 border border-gray-800 space-y-3">
+        <p className="font-medium text-white text-sm">Crear rama fix/...</p>
+        <div className="flex gap-2">
           <input
             type="text"
             value={fixBranch.replace("fix/", "")}
-            onChange={(e) => setFixBranch(`fix/${e.target.value}`)}
+            onChange={(e) => setFixBranch(`fix/${e.target.value}` as FixBranch)}
             placeholder="nombre-slug"
-            className="bg-gray-800 border border-gray-600 rounded-md px-3 py-2 flex-1 text-sm focus:outline-none focus:border-indigo-500"
+            className="bg-gray-800 border border-gray-600 rounded-md px-3 py-2 flex-1 text-sm focus:outline-none focus:border-indigo-500 text-white"
           />
           <button
             onClick={handleCreateFixBranch}
-            className="px-4 py-2 bg-green-600 text-white rounded-md font-medium hover:bg-green-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            disabled={!fixBranch.includes("fix/") || !sessionId}
+            className="px-4 py-2 bg-green-600 text-white rounded-md font-medium text-sm hover:bg-green-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            disabled={!fixBranch.includes("fix/")}
           >
             Crear rama
           </button>
@@ -197,161 +191,160 @@ export function GitControlView() {
 
       {/* Sección: Begin Attempt */}
       {sessionId ? (
-        <div>
-          <p className="font-medium text-white">Iniciar Attempt</p>
+        <div className="bg-gray-900/50 rounded-lg p-4 border border-gray-800 space-y-3">
+          <p className="font-medium text-white text-sm">Iniciar Attempt</p>
           <button
             onClick={handleBeginAttempt}
-            className="px-4 py-2 bg-orange-600 text-white rounded-md font-medium hover:bg-orange-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            disabled={!attemptId}
+            className="px-4 py-2 bg-orange-600 text-white rounded-md font-medium text-sm hover:bg-orange-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Iniciar intento
           </button>
-          {attemptId && <p className="text-sm text-gray-400 mt-1">Checkpoint: {checkpointCommit || "—"}</p>}
+          {attemptId && <p className="text-xs text-gray-400 mt-1">Checkpoint: {checkpointCommit || "—"}</p>}
         </div>
       ) : null}
-      }
 
       {/* Sección: Apply Patch */}
-      {attemptId && unifiedDiff ? (
-        <div>
-          <p className="font-medium text-white">Aplicar Patch</p>
+      {attemptId ? (
+        <div className="bg-gray-900/50 rounded-lg p-4 border border-gray-800 space-y-3">
+          <p className="font-medium text-white text-sm">Aplicar Patch</p>
           <textarea
             value={unifiedDiff}
             onChange={(e) => setUnifiedDiff(e.target.value)}
             placeholder="Diff unificado..."
             rows={5}
-            className="bg-gray-800 border border-gray-600 rounded-md w-full px-3 py-2 text-xs resize-none focus:outline-none focus:border-indigo-500 mb-3"
+            className="bg-gray-800 border border-gray-600 rounded-md w-full px-3 py-2 text-xs text-white resize-none focus:outline-none focus:border-indigo-500"
           ></textarea>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div>
-              <p className="font-semibold text-gray-300">Hash esperado</p>
+              <p className="font-semibold text-gray-300 text-xs mb-1">Hash esperado</p>
               <input
                 type="text"
-                value={expectedDiffHash || ""}
+                value={expectedDiffHash}
                 onChange={(e) => setExpectedDiffHash(e.target.value)}
                 placeholder="hash SHA-256"
-                className="bg-gray-800 border border-gray-600 rounded-md px-3 py-2 text-sm focus:outline-none focus:border-indigo-500"
+                className="bg-gray-800 border border-gray-600 rounded-md px-3 py-2 text-sm w-full focus:outline-none focus:border-indigo-500 text-white"
               />
             </div>
             <div>
-              <p className="font-semibold text-gray-300">Hash por archivo</p>
+              <p className="font-semibold text-gray-300 text-xs mb-1">Hash por archivo</p>
               <input
                 type="text"
                 value={Object.keys(expectedFileHashes).length > 0 ? "configurada" : ""}
+                readOnly
                 placeholder="hashes (JSON opcional)"
-                className="bg-gray-800 border border-gray-600 rounded-md px-3 py-2 text-sm focus:outline-none focus:border-indigo-500"
+                className="bg-gray-800 border border-gray-600 rounded-md px-3 py-2 text-sm w-full focus:outline-none focus:border-indigo-500 text-white"
               />
             </div>
           </div>
           <button
             onClick={handleApplyPatch}
-            className="px-4 py-2 bg-blue-600 text-white rounded-md font-medium hover:bg-blue-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-4 py-2 bg-blue-600 text-white rounded-md font-medium text-sm hover:bg-blue-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             disabled={!unifiedDiff.trim()}
           >
             Aplicar parche
           </button>
-          {applied !== null && <p className="mt-2 text-sm">Parche: {applied ? "Aplicado" : "No aplicado"} (hash: {diffHash || "—"})</p>}
-        </div> : null)
-      }
+          {applied !== null && <p className="mt-2 text-xs text-gray-300">Parche: {applied ? "Aplicado" : "No aplicado"} (hash: {diffHash || "—"})</p>}
+        </div>
+      ) : null}
 
       {/* Sección: Commit Fix */}
-      {attemptId && commitMessage && expectedDiffHash && verificationRunId ? (
-        <div>
-          <p className="font-medium text-white">Confirmar Commit Fix</p>
-          <div className="grid grid-cols-2 gap-3">
+      {attemptId ? (
+        <div className="bg-gray-900/50 rounded-lg p-4 border border-gray-800 space-y-3">
+          <p className="font-medium text-white text-sm">Confirmar Commit Fix</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div>
-              <p className="font-semibold text-gray-300">Mensaje</p>
+              <p className="font-semibold text-gray-300 text-xs mb-1">Mensaje</p>
               <input
                 type="text"
                 value={commitMessage}
                 onChange={(e) => setCommitMessage(e.target.value)}
                 placeholder="Descripción del fix"
-                className="bg-gray-800 border border-gray-600 rounded-md px-3 py-2 text-sm focus:outline-none focus:border-indigo-500"
+                className="bg-gray-800 border border-gray-600 rounded-md px-3 py-2 text-sm w-full focus:outline-none focus:border-indigo-500 text-white"
               />
             </div>
             <div>
-              <p className="font-semibold text-gray-300">Diff hash</p>
+              <p className="font-semibold text-gray-300 text-xs mb-1">Diff hash</p>
               <input
                 type="text"
                 value={expectedDiffHash}
                 onChange={(e) => setExpectedDiffHash(e.target.value)}
                 placeholder="hash diff esperado"
-                className="bg-gray-800 border border-gray-600 rounded-md px-3 py-2 text-sm focus:outline-none focus:border-indigo-500"
+                className="bg-gray-800 border border-gray-600 rounded-md px-3 py-2 text-sm w-full focus:outline-none focus:border-indigo-500 text-white"
               />
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div>
-              <p className="font-semibold text-gray-300">Run ID verificación</p>
+              <p className="font-semibold text-gray-300 text-xs mb-1">Run ID verificación</p>
               <input
                 type="text"
                 value={verificationRunId}
                 onChange={(e) => setVerificationRunId(e.target.value)}
                 placeholder="ID run pruebas"
-                className="bg-gray-800 border border-gray-600 rounded-md px-3 py-2 text-sm focus:outline-none focus:border-indigo-500"
+                className="bg-gray-800 border border-gray-600 rounded-md px-3 py-2 text-sm w-full focus:outline-none focus:border-indigo-500 text-white"
               />
             </div>
             <div>
-              <p className="font-semibold text-gray-300">Attempt ID</p>
+              <p className="font-semibold text-gray-300 text-xs mb-1">Attempt ID</p>
               <input
                 type="text"
                 value={attemptId}
                 disabled
-                className="bg-gray-800 border border-gray-600 rounded-md px-3 py-2 text-sm focus:outline-none focus:border-indigo-500"
+                className="bg-gray-800 border border-gray-600 rounded-md px-3 py-2 text-sm w-full focus:outline-none focus:border-indigo-500 text-gray-400"
               />
             </div>
           </div>
           <button
             onClick={handleCommitFix}
-            className="px-4 py-2 bg-purple-600 text-white rounded-md font-medium hover:bg-purple-500 transition-colors w-full disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-4 py-2 bg-purple-600 text-white rounded-md font-medium text-sm hover:bg-purple-500 transition-colors w-full disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Confirmar commit
           </button>
-        </div> : null)
-      }
+        </div>
+      ) : null}
 
       {/* Sección: Rollback */}
-      {sessionId && rollbackBranch ? (
-        <div>
-          <p className="font-medium text-white">Revertir Cambios (Rollback)</p>
-          <div className="grid grid-cols-2 gap-3">
+      {sessionId ? (
+        <div className="bg-gray-900/50 rounded-lg p-4 border border-gray-800 space-y-3">
+          <p className="font-medium text-white text-sm">Revertir Cambios (Rollback)</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div>
-              <p className="font-semibold text-gray-300">Rama</p>
+              <p className="font-semibold text-gray-300 text-xs mb-1">Rama</p>
               <input
                 type="text"
                 value={rollbackBranch.replace("fix/", "")}
-                onChange={(e) => setRollbackBranch(`fix/${e.target.value}`)}
+                onChange={(e) => setRollbackBranch(`fix/${e.target.value}` as FixBranch)}
                 placeholder="nombre-slug"
-                className="bg-gray-800 border border-gray-600 rounded-md px-3 py-2 flex-1 text-sm focus:outline-none focus:border-indigo-500"
+                className="bg-gray-800 border border-gray-600 rounded-md px-3 py-2 w-full text-sm focus:outline-none focus:border-indigo-500 text-white"
               />
             </div>
             <div>
-              <p className="font-semibold text-gray-300">Attempt ID</p>
+              <p className="font-semibold text-gray-300 text-xs mb-1">Attempt ID</p>
               <input
                 type="text"
                 value={rollbackAttemptId}
                 onChange={(e) => setRollbackAttemptId(e.target.value)}
                 placeholder="ID attempt"
-                className="bg-gray-800 border border-gray-600 rounded-md px-3 py-2 text-sm focus:outline-none focus:border-indigo-500"
+                className="bg-gray-800 border border-gray-600 rounded-md px-3 py-2 w-full text-sm focus:outline-none focus:border-indigo-500 text-white"
               />
             </div>
           </div>
           <button
             onClick={handleRollback}
-            className="px-4 py-2 bg-red-600 text-white rounded-md font-medium hover:bg-red-500 transition-colors w-full disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-4 py-2 bg-red-600 text-white rounded-md font-medium text-sm hover:bg-red-500 transition-colors w-full disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Revertir attempt
           </button>
           {restoredCommit && (
-            <div className="mt-3 p-3 rounded-lg bg-gray-800/50">
+            <div className="mt-3 p-3 rounded-lg bg-gray-800/50 border border-gray-700 space-y-1 text-xs">
               <p className="font-medium text-white">Rollback completado</p>
               <p className="text-gray-300">Restaurado: {restoredCommit || "—"}</p>
               <p className="text-gray-300">Archivos revertidos: {revertedFiles.length > 0 ? revertedFiles.join(", ") : "Ninguno"}</p>
-              <p className={`text-${rollbackClean ? "green" : "red"}-400`>{rollbackClean ? "Directorio clean" : "Queda trabajo ajeno"}</p>
+              <p className={rollbackClean ? "text-green-400" : "text-red-400"}>{rollbackClean ? "Directorio clean" : "Queda trabajo ajeno"}</p>
             </div>
           )}
-        </div> : null)
-      )}
+        </div>
+      ) : null}
     </div>
   );
 }
