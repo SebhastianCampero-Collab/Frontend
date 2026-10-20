@@ -16,6 +16,24 @@ describe('HTTP and MCP contracts', () => {
     expect(await client.projects()).toEqual([project]);
     expect(fetcher.mock.calls[0]?.[0]).toBe('http://backend/api/projects');
   });
+  it('prepares a cloud demo without accepting filesystem paths from the browser', async () => {
+    const setup = {
+      project,
+      repair: {
+        path: 'src/target-bug.ts',
+        slug: 'cloud-demo',
+        message: 'fix: demo',
+        runner: 'jest',
+        targets: ['tests/target-bug.test.cjs'],
+        expectedFileHashes: { 'src/target-bug.ts': 'a'.repeat(64) },
+        unifiedDiff: '+demo',
+      },
+    };
+    fetcher.mockResolvedValue(reply(setup, 201));
+    expect(await client.prepareDemo()).toEqual(setup);
+    expect(fetcher.mock.calls[0]?.[0]).toBe('http://backend/api/demo/prepare');
+    expect(JSON.parse(String(fetcher.mock.calls[0]?.[1]?.body))).toEqual({});
+  });
   it('registers projects with a typed body and bearer held only in memory', async () => {
     client.setToken('test-session');
     fetcher.mockResolvedValue(reply(project, 201));

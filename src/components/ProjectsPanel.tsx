@@ -52,7 +52,7 @@ export function ProjectsPanel({
         </label>
         <label>
           Rama predeterminada
-          <input name="branch" required defaultValue="main" />
+          <input name="branch" required defaultValue="Dev" />
         </label>
         <label>
           Runner

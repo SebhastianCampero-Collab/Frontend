@@ -28,12 +28,13 @@ export function GitControlView({ details }: { details: AuditDetails }) {
           <dd>{details.audit.status}</dd>
         </div>
       </dl>
-      {details.audit.summaryJson['mode'] === 'diagnose' && (
-        <p className="notice">
-          Diagnóstico sin autorización de reparación: el estado persistido «blocked» no significa
-          que el análisis haya fallado.
-        </p>
-      )}
+      {details.audit.summaryJson['mode'] === 'diagnose' &&
+        details.audit.summaryJson['outcome'] === 'diagnosed' && (
+          <p className="notice">
+            Diagnóstico sin autorización de reparación: el estado persistido «blocked» no significa
+            que el análisis haya fallado.
+          </p>
+        )}
       {blocked && (
         <p className="notice danger">
           Se registró un bloqueo de política. Revisa la evidencia de hooks; una reversión puede

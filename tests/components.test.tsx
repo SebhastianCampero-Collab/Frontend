@@ -10,6 +10,67 @@ import { ProjectsPanel } from '../src/components/ProjectsPanel';
 import { config, delegation, details, diagnosed, health, log, project, tools } from './fixtures';
 
 describe('dashboard views', () => {
+  it('loads a server-owned demo with a fresh hash and executes the explicit repair', async () => {
+    vi.spyOn(api, 'health').mockResolvedValue(health);
+    vi.spyOn(api, 'projects').mockResolvedValue([project]);
+    vi.spyOn(api, 'audits').mockResolvedValue([]);
+    const demoProject = {
+      ...project,
+      id: '33333333-3333-4333-8333-333333333333',
+      name: 'Demo Render real',
+      defaultBranch: 'Dev',
+    };
+    const repair = {
+      path: 'src/target-bug.ts',
+      slug: 'cloud-demo-real',
+      message: 'fix: demo',
+      runner: 'jest' as const,
+      targets: ['tests/target-bug.test.cjs'],
+      expectedFileHashes: { 'src/target-bug.ts': 'b'.repeat(64) },
+      unifiedDiff: 'diff --git a/src/target-bug.ts b/src/target-bug.ts\n',
+    };
+    vi.spyOn(api, 'prepareDemo').mockResolvedValue({ project: demoProject, repair });
+    const run = vi.spyOn(api, 'runAudit').mockResolvedValue({ ...diagnosed, project: demoProject });
+    const initialView = render(<App />);
+    await screen.findByText('Backend conectado');
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Cargar Demo Reparación / Subagentes' }),
+    );
+    await waitFor(() =>
+      expect(screen.getByLabelText('Archivo dentro del proyecto')).toHaveValue(repair.path),
+    );
+    expect(screen.getByLabelText('SHA-256 esperado')).toHaveValue('b'.repeat(64));
+    expect(screen.getByLabelText(/Targets de jest/)).toHaveValue('tests/target-bug.test.cjs');
+    expect(screen.getByLabelText('Proyecto activo')).toHaveValue(demoProject.id);
+    fireEvent.click(screen.getByRole('button', { name: 'Ejecutar reparación' }));
+    await waitFor(() =>
+      expect(run).toHaveBeenCalledWith({ projectId: demoProject.id, mode: 'repair', repair }),
+    );
+    initialView.unmount();
+    vi.spyOn(api, 'projects').mockResolvedValue([demoProject]);
+    render(<App />);
+    await waitFor(() =>
+      expect(screen.getByLabelText('Archivo dentro del proyecto')).toHaveValue(repair.path),
+    );
+  });
+  it('does not label a failed diagnosis as a successful read-only diagnosis', async () => {
+    vi.spyOn(api, 'audits').mockResolvedValue([]);
+    vi.spyOn(api, 'runAudit').mockResolvedValue({
+      ...diagnosed,
+      status: 'failed',
+      audit: {
+        ...details.audit,
+        status: 'failed',
+        summaryJson: { mode: 'diagnose', outcome: 'failed' },
+      },
+    });
+    render(<AuditPanel project={project} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Ejecutar diagnóstico' }));
+    await screen.findByText('Estado persistido');
+    expect(
+      screen.queryByText(/Diagnóstico sin autorización de reparación/),
+    ).not.toBeInTheDocument();
+  });
   it('shows actual backend and DB health and keeps authorization out of localStorage', async () => {
     vi.spyOn(api, 'health').mockResolvedValue(health);
     vi.spyOn(api, 'projects').mockResolvedValue([project]);
@@ -43,7 +104,7 @@ describe('dashboard views', () => {
     expect(register).toHaveBeenCalledWith({
       name: project.name,
       repoPath: project.repoPath,
-      defaultBranch: 'main',
+      defaultBranch: 'Dev',
       runnerType: 'jest',
     });
   });
@@ -56,7 +117,7 @@ describe('dashboard views', () => {
     expect(run).toHaveBeenCalledWith({
       projectId: project.id,
       mode: 'diagnose',
-      path: 'src/bug.ts',
+      path: 'src/server/contracts.ts',
     });
     expect(screen.getByText(/Diagnóstico sin autorización de reparación/)).toBeInTheDocument();
   });
@@ -74,17 +135,15 @@ describe('dashboard views', () => {
   it('obtains a trusted hash and sends the explicit patch, same target and registered runner', async () => {
     vi.spyOn(api, 'audits').mockResolvedValue([]);
     vi.spyOn(api, 'callTool').mockResolvedValue({
-      data: { path: 'src/bug.ts', fileHash: 'a'.repeat(64) },
+      data: { path: 'src/server/contracts.ts', fileHash: 'a'.repeat(64) },
       meta: {},
     });
-    const run = vi
-      .spyOn(api, 'runAudit')
-      .mockResolvedValue({
-        ...diagnosed,
-        mode: 'repair',
-        status: 'rolled_back',
-        audit: { ...details.audit, status: 'rolled_back', summaryJson: {} },
-      });
+    const run = vi.spyOn(api, 'runAudit').mockResolvedValue({
+      ...diagnosed,
+      mode: 'repair',
+      status: 'rolled_back',
+      audit: { ...details.audit, status: 'rolled_back', summaryJson: {} },
+    });
     render(<AuditPanel project={project} />);
     fireEvent.click(screen.getByRole('button', { name: 'Reparación verificada' }));
     fireEvent.click(screen.getByRole('button', { name: 'Obtener hash actual' }));
@@ -95,7 +154,7 @@ describe('dashboard views', () => {
       target: { value: 'tests/bug.test.cjs' },
     });
     fireEvent.change(screen.getByLabelText('Parche unified diff'), {
-      target: { value: 'diff --git a/src/bug.ts b/src/bug.ts\n' },
+      target: { value: 'diff --git a/src/server/contracts.ts b/src/server/contracts.ts\n' },
     });
     fireEvent.click(screen.getByRole('button', { name: 'Ejecutar reparación' }));
     await waitFor(() => expect(run).toHaveBeenCalled());
@@ -103,7 +162,7 @@ describe('dashboard views', () => {
     expect(request?.mode).toBe('repair');
     if (request?.mode === 'repair')
       expect(request.repair).toMatchObject({
-        expectedFileHashes: { 'src/bug.ts': 'a'.repeat(64) },
+        expectedFileHashes: { 'src/server/contracts.ts': 'a'.repeat(64) },
         runner: 'jest',
         targets: ['tests/bug.test.cjs'],
       });
@@ -126,14 +185,12 @@ describe('dashboard views', () => {
   it('triggers an actual guardrail call and displays BLOCK evidence', async () => {
     vi.spyOn(api, 'hookConfig').mockResolvedValue(config);
     vi.spyOn(api, 'hookLogs').mockResolvedValue([log]);
-    const evaluate = vi
-      .spyOn(api, 'evaluateHook')
-      .mockResolvedValue({
-        ...details,
-        hookLogs: [log],
-        auditId: details.audit.id,
-        decision: 'block',
-      });
+    const evaluate = vi.spyOn(api, 'evaluateHook').mockResolvedValue({
+      ...details,
+      hookLogs: [log],
+      auditId: details.audit.id,
+      decision: 'block',
+    });
     render(<GuardrailsPanel projectId={project.id} />);
     fireEvent.click(screen.getByRole('button', { name: 'Probar BLOCK · .env' }));
     await waitFor(() =>

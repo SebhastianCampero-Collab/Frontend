@@ -1,5 +1,31 @@
 # DevGuardian · Dashboard de operaciones
 
+## 🌐 Entorno de Producción Desplegado (Render)
+
+- **URL Pública del Frontend (Dashboard):** https://proyecto-certificacion-ai-frontend.onrender.com
+- **URL Pública del Backend (API & Healthcheck):** https://proyecto-certificacion-ai-backend.onrender.com/api/health
+- **Base de Datos Cloud:** PostgreSQL **PCAI**, base lógica `pcai`, modo `postgres`, **5 tablas activas**.
+- **Ramas activas:** `Dev` (Backend), `dev` (Frontend); versión de entrega consolidada también en `main` de ambos repositorios, conservando la autoría.
+- **CI/CD:** GitHub Actions valida cada rama de entrega. Render espera **After CI Checks Pass** antes de redesplegar.
+- **Runner en Render Free:** Node/Jest. **pytest se valida obligatoriamente en Ubuntu de GitHub Actions**, con Python 3.11, pytest-json-report y `DEVGUARDIAN_REQUIRE_PYTEST=1`; el health de la instancia web puede indicar pytest no disponible.
+- **Calidad:** base anterior **285 pruebas Backend + 44 Frontend = 329**. Este cierre añade dos regresiones de backend y tres de frontend: **287 + 47 = 334 pruebas**, en **10 suites Backend + 3 archivos Vitest**.
+- **Alcance:** Fases 1 a 6 implementadas. API, MCP HTTP, workers, Git, análisis, Jest y persistencia se ejecutan en el backend desplegado; el cliente generativo de Fase 6 es una CLI MCP, no un endpoint LLM del dashboard. No se acredita una llamada pagada real a Anthropic.
+
+Los secretos se configuran en Environment de Render. Las copias locales `.env` están ignoradas por Git; nunca publicar DATABASE_URL ni claves en variables VITE_*.
+
+### Demo en vivo en tres clics
+
+1. En Auditoría, **Cargar Demo Reparación / Subagentes**. Se crea y registra un checkout nuevo con fallo real, rama inicial Dev, parche y SHA-256 calculado en el servidor.
+2. **Ejecutar reparación**. Esperar COMMITTED: diagnóstico en worker, baseline con un fallo y un aprobado, candidato con dos aprobados, hooks y commit en fix/… del checkout de demo.
+3. **Subagentes**. Mostrar las delegaciones diagnostic/verification y su consumo committed. El selector conserva el proyecto de demo; F5 recupera auditoría, pruebas y trazas de PCAI.
+
+Para diagnóstico independiente: **Cargar Demo Diagnóstico Real → Ejecutar diagnóstico**. El resultado DIAGNOSED conserva outcome=diagnosed y traza completed; la sesión DB mantiene status=blocked por el contrato histórico, pues diagnosticar no autoriza un commit. No es un error.
+
+En **Hooks & Guardrails**, ejecutar **Probar ALLOW** y **Probar BLOCK · .env**. Son preflights reales: guardan evidencia y no modifican archivos. Recargar para comprobar persistencia. No se borran registros fallidos anteriores.
+
+La preparación usa POST /api/demo/prepare con cuerpo vacío; no acepta rutas ni comandos del navegador. Está habilitada en Render o con DEVGUARDIAN_ENABLE_DEMO=1 y limitada a 20 checkouts por proceso. Cada repetición usa un proyecto distinto: nunca restaura ni elimina trabajo previo. Los checkouts son efímeros al redesplegar; las auditorías permanecen en PCAI. Para repetir tras reinicio, cargar una nueva demo. La plantilla fixtures/cloud-demo queda fuera del build y de la suite principal; sus dos casos Jest se ejecutan contra la fuente real al reparar.
+
+
 [![Frontend CI](https://github.com/SebhastianCampero-Collab/Frontend/actions/workflows/ci.yml/badge.svg?branch=dev)](https://github.com/SebhastianCampero-Collab/Frontend/actions/workflows/ci.yml)
 
 Frontend React/TypeScript/Vite para operar el backend de DevGuardian. Trabaja con datos reales de REST y MCP: registra repositorios, ejecuta diagnóstico o reparación con un parche explícito, recupera auditorías desde la BD y muestra decisiones de guardrails y delegaciones a workers. No fabrica eventos, commits, herramientas ni resultados de pruebas.
@@ -121,7 +147,7 @@ npm.cmd run build
 npm.cmd run preview
 ```
 
-La entrega incluye **44 pruebas en 3 archivos**: contratos HTTP/JSON-RPC, 403 y 503, auth, validación, los seis custom hooks, respuestas obsoletas, prevención de mutaciones duplicadas, diagnóstico/reparación, recuperación del historial, guardrails, workers y catálogo MCP. Las pruebas unitarias simulan la frontera HTTP o el cliente; el helper anterior permite comprobar la integración con motores reales. Ninguna prueba de CI requiere backend remoto, BD cloud ni credenciales.
+La entrega incluye **47 pruebas en 3 archivos**: contratos HTTP/JSON-RPC, 403 y 503, auth, validación, los seis custom hooks, respuestas obsoletas, prevención de mutaciones duplicadas, diagnóstico/reparación, recuperación del historial, guardrails, workers y catálogo MCP. Las pruebas unitarias simulan la frontera HTTP o el cliente; el helper anterior permite comprobar la integración con motores reales. Ninguna prueba de CI requiere backend remoto, BD cloud ni credenciales.
 
 El workflow ejecuta `npm ci`, tipos + ESLint, Vitest y build en pushes/PR a `main`, `dev`, `Dev` y manualmente con `workflow_dispatch`. Usa Node 24, permisos de lectura, cancelación por rama y publica `dist` como artefacto. El estado remoto solo se acredita al subir los cambios y ejecutar Actions; una comprobación local no implica una ejecución remota aprobada.
 
@@ -134,6 +160,6 @@ El bundle estático se genera en `dist/`. Configurar Node 24, `VITE_API_URL` con
 | Vercel    | Importar el repositorio, preset Vite, rama deseada, instalación `npm ci`, build `npm run build`, output `dist`. Configurar `VITE_API_URL` antes de compilar. |
 | Render    | Crear **Static Site**, conectar rama, build `npm ci && npm run build`, publish directory `dist`, añadir `VITE_API_URL`.                                      |
 
-Las vistas se seleccionan dentro de la página raíz, por lo que no requieren reglas SPA para rutas adicionales. No se ha desplegado ni configurado CD desde esta entrega. No guardar secretos Anthropic, DATABASE_URL ni bearer en variables `VITE_*`: se incorporan al JavaScript público.
+Las vistas se seleccionan dentro de la página raíz, por lo que no requieren reglas SPA para rutas adicionales. El Static Site está desplegado en Render y su integración Git espera los checks de CI antes del redespliegue. No guardar secretos Anthropic, DATABASE_URL ni bearer en variables `VITE_*`: se incorporan al JavaScript público.
 
 Referencias oficiales: [variables de Vite](https://vite.dev/guide/env-and-mode), [Vite en Vercel](https://vercel.com/docs/frameworks/frontend/vite), [sitios estáticos en Render](https://render.com/docs/static-sites).

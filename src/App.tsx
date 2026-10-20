@@ -21,6 +21,9 @@ import { GuardrailsPanel } from './components/GuardrailsPanel';
 import { AgentMonitorView } from './components/AgentMonitorView';
 import { McpPanel } from './components/McpPanel';
 import { Empty, ErrorNotice } from './components/ui';
+import { DemoPresets } from './components/DemoPresets';
+import { useAction } from './hooks/useResource';
+import type { DemoSetup } from './types/contracts';
 
 const tabs = [
   { id: 'audit', label: 'Auditoría', icon: LayoutDashboard, number: '01' },
@@ -46,7 +49,18 @@ export default function App() {
   const [revision, setRevision] = useState(0);
   const [token, setToken] = useState('');
   const [tokenSet, setTokenSet] = useState(false);
-  const project = projects.data?.find((item) => item.id === selectedId) ?? projects.data?.[0];
+  const demo = useAction<DemoSetup>();
+  const [demoMode, setDemoMode] = useState<'diagnose' | 'repair'>('diagnose');
+  const visibleProjects = [...(projects.data ?? [])];
+  if (demo.data && !visibleProjects.some((item) => item.id === demo.data?.project.id))
+    visibleProjects.push(demo.data.project);
+  const project =
+    (demo.data?.project.id === selectedId ? demo.data.project : undefined) ??
+    projects.data?.find((item) => item.id === selectedId) ??
+    projects.data
+      ?.filter((item) => item.name.startsWith('Demo Render '))
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0] ??
+    projects.data?.[0];
   const selectProject = (id: string) => {
     setSelectedId(id);
     try {
@@ -60,6 +74,15 @@ export default function App() {
     projects.refresh();
     setRevision((value) => value + 1);
   };
+  const prepareDemo = async (mode: 'diagnose' | 'repair') => {
+    const setup = await demo.execute(() => api.prepareDemo());
+    setDemoMode(mode);
+    selectProject(setup.project.id);
+    projects.refresh();
+  };
+  const demoControls = (
+    <DemoPresets prepare={prepareDemo} pending={demo.pending} error={demo.error} />
+  );
   return (
     <div className="app-shell">
       <a className="skip-link" href="#main-content">
@@ -190,10 +213,10 @@ export default function App() {
                   aria-label="Proyecto activo"
                   value={project?.id ?? ''}
                   onChange={(event) => selectProject(event.target.value)}
-                  disabled={!projects.data?.length}
+                  disabled={!visibleProjects.length}
                 >
-                  {!projects.data?.length && <option value="">Sin proyectos registrados</option>}
-                  {projects.data?.map((item) => (
+                  {!visibleProjects.length && <option value="">Sin proyectos registrados</option>}
+                  {visibleProjects.map((item) => (
                     <option key={item.id} value={item.id}>
                       {item.name} · {item.defaultBranch}
                     </option>
@@ -232,7 +255,13 @@ export default function App() {
           <div key={`${project?.id ?? 'none'}-${tab}-${revision}`}>
             {project ? (
               tab === 'audit' ? (
-                <AuditPanel project={project} />
+                <AuditPanel
+                  project={project}
+                  demoControls={demoControls}
+                  {...(demo.data?.project.id === project.id
+                    ? { initialRepair: demo.data.repair, initialMode: demoMode }
+                    : {})}
+                />
               ) : tab === 'hooks' ? (
                 <GuardrailsPanel projectId={project.id} />
               ) : tab === 'agents' ? (
@@ -242,6 +271,7 @@ export default function App() {
               )
             ) : (
               <section className="panel">
+                {tab === 'audit' && demoControls}
                 <Empty>
                   {projects.loading
                     ? 'Cargando proyectos…'

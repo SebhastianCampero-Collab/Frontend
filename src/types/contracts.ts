@@ -163,6 +163,8 @@ export const RepairSchema = z
     'El hash debe corresponder exactamente al archivo objetivo.',
   );
 export type Repair = z.infer<typeof RepairSchema>;
+export const DemoSetupSchema = z.object({ project: ProjectSchema, repair: RepairSchema });
+export type DemoSetup = z.infer<typeof DemoSetupSchema>;
 export type AuditRequest =
   | { projectId: string; mode: 'diagnose'; path: string }
   | { projectId: string; mode: 'repair'; repair: Repair };

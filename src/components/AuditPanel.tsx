@@ -1,22 +1,35 @@
 import { useState } from 'react';
-import type { FormEvent } from 'react';
+import type { FormEvent, ReactNode } from 'react';
 import { Play, GitBranch, FileCode2, History, Fingerprint } from 'lucide-react';
 import { api, message } from '../api/client';
 import { useAuditRunner } from '../hooks/useAuditRunner';
 import { useAction } from '../hooks/useResource';
 import { RelativePathSchema, RepairSchema, auditLabel, record } from '../types/contracts';
-import type { Project } from '../types/contracts';
+import type { Project, Repair } from '../types/contracts';
 import { CodeInspector } from './CodeInspector';
 import { TestRunnerView } from './TestRunnerView';
 import { GitControlView } from './GitControlView';
 import { Badge, Empty, ErrorNotice, Pagination } from './ui';
 
-export function AuditPanel({ project }: { project: Project }) {
+export function AuditPanel({
+  project,
+  initialRepair,
+  initialMode = 'diagnose',
+  demoControls,
+}: {
+  project: Project;
+  initialRepair?: Repair;
+  initialMode?: 'diagnose' | 'repair';
+  demoControls?: ReactNode;
+}) {
   const [offset, setOffset] = useState(0);
   const audit = useAuditRunner(project.id, offset);
-  const [mode, setMode] = useState<'diagnose' | 'repair'>('diagnose');
-  const [path, setPath] = useState('src/bug.ts');
-  const [hash, setHash] = useState('');
+  const [mode, setMode] = useState<'diagnose' | 'repair'>(initialMode);
+  const [path, setPath] = useState(
+    initialRepair?.path ??
+      (project.name.startsWith('Demo Render ') ? 'src/target-bug.ts' : 'src/server/contracts.ts'),
+  );
+  const [hash, setHash] = useState(initialRepair?.expectedFileHashes[initialRepair.path] ?? '');
   const [validation, setValidation] = useState<string | null>(null);
   const context = useAction<{ path: string; fileHash: string }>();
   const hashValue = hash || (context.data?.path === path ? context.data.fileHash : '');
@@ -72,6 +85,14 @@ export function AuditPanel({ project }: { project: Project }) {
             </div>
             <Badge value={audit.phase} />
           </div>
+          {demoControls && (
+            <fieldset
+              disabled={audit.pending || audit.selecting}
+              style={{ border: 0, padding: 0, minWidth: 0 }}
+            >
+              {demoControls}
+            </fieldset>
+          )}
           <div className="segmented">
             <button
               className={mode === 'diagnose' ? 'active' : ''}
@@ -136,7 +157,7 @@ export function AuditPanel({ project }: { project: Project }) {
                   Nombre de rama fix/…
                   <input
                     name="slug"
-                    defaultValue="dashboard-repair"
+                    defaultValue={initialRepair?.slug ?? 'dashboard-repair'}
                     required
                     pattern="[a-z0-9]+(-[a-z0-9]+)*"
                     disabled={audit.pending}
@@ -146,7 +167,9 @@ export function AuditPanel({ project }: { project: Project }) {
                   Mensaje del commit
                   <input
                     name="message"
-                    defaultValue="fix: reparación verificada desde dashboard"
+                    defaultValue={
+                      initialRepair?.message ?? 'fix: reparación verificada desde dashboard'
+                    }
                     required
                     disabled={audit.pending}
                   />
@@ -155,6 +178,7 @@ export function AuditPanel({ project }: { project: Project }) {
                   Targets de {project.runnerType} (separados por coma)
                   <input
                     name="targets"
+                    defaultValue={initialRepair?.targets.join(', ') ?? ''}
                     required
                     placeholder={
                       project.runnerType === 'jest' ? 'tests/bug.test.cjs' : 'tests/test_bug.py'
@@ -166,10 +190,11 @@ export function AuditPanel({ project }: { project: Project }) {
                   Parche unified diff
                   <textarea
                     name="diff"
+                    defaultValue={initialRepair?.unifiedDiff ?? ''}
                     rows={8}
                     spellCheck={false}
                     required
-                    placeholder="diff --git a/src/bug.ts b/src/bug.ts"
+                    placeholder="diff --git a/src/server/contracts.ts b/src/server/contracts.ts"
                     disabled={audit.pending}
                   />
                 </label>

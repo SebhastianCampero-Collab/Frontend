@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import {
   AuditDetailsSchema,
+  DemoSetupSchema,
   AuditRunSchema,
   HealthSchema,
   HookConfigSchema,
@@ -126,6 +127,7 @@ export class ApiClient {
     this.request('/api/projects', z.array(ProjectSchema), undefined, signal);
   registerProject = (input: RegisterProject) =>
     this.request('/api/projects', ProjectSchema, RegisterProjectSchema.parse(input));
+  prepareDemo = () => this.request('/api/demo/prepare', DemoSetupSchema, {});
   audits = (filter: ListFilter = {}, signal?: AbortSignal) =>
     this.request(`/api/audits${query(filter)}`, z.array(AuditDetailsSchema), undefined, signal);
   audit = (id: string, signal?: AbortSignal) =>
