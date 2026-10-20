@@ -1,228 +1,121 @@
 import { useState } from "react";
+import { Header } from "./components/Header";
+import { CodeInspector } from "./components/CodeInspector";
+import { TestRunnerView } from "./components/TestRunnerView";
+import { GitControlView } from "./components/GitControlView";
+import { AgentMonitorView } from "./components/AgentMonitorView";
+import { ResultDrawer } from "./components/ResultDrawer";
 
-type ToolName =
-  | "read_file_context"
-  | "analyze_code"
-  | "get_symbol_context"
-  | "git_status"
-  | "git_create_fix_branch"
-  | "git_begin_attempt"
-  | "git_apply_patch"
-  | "git_diff"
-  | "git_commit_fix"
-  | "git_rollback_attempt"
-  | "run_tests"
-  | "compare_test_runs";
-
-interface ToolResult {
+type ResultType = {
   ok: boolean;
   data?: unknown;
-  error?: {
-    code: string;
-    message: string;
-  };
-}
-
-const handlerMap: Record<ToolName, (params: Record<string, unknown>) => Promise<ToolResult>> = {
-  read_file_context: async (params) => {
-    // Placeholder - will be connected to backend
-    return { ok: true, data: { path: (params as any).path, content: "..." } };
-  },
-  analyze_code: async (params) => {
-    return { ok: true, data: { analysisId: "id1", diagnostics: [] } };
-  },
-  get_symbol_context: async (params) => {
-    return { ok: true, data: { symbol: "func", range: { start: { line: 1, column: 1 }, end: { line: 1, column: 10 } } } };
-  },
-  git_status: async () => {
-    return { ok: true, data: { branch: "main", headCommit: "abc", clean: true, staged: [], modified: [], untracked: [], conflicted: false } };
-  },
-  git_create_fix_branch: async (params) => {
-    return { ok: true, data: { sessionId: "s1", branch: "fix/refactor-xyz", baseBranch: "main", baseCommit: "abc" } };
-  },
-  git_begin_attempt: async (params) => {
-    return { ok: true, data: { attemptId: "a1", checkpointCommit: "abc" } };
-  },
-  git_apply_patch: async (params) => {
-    return { ok: true, data: { applied: true, changedFiles: [], diffHash: "xyz" } };
-  },
-  git_diff: async (params) => {
-    return { ok: true, data: { diff: "", diffHash: "xyz", changedFiles: [], insertions: 0, deletions: 0 } };
-  },
-  git_commit_fix: async (params) => {
-    return { ok: true, data: { commit: "xyz", branch: "fix/refactor-xyz", files: [] } };
-  },
-  git_rollback_attempt: async (params) => {
-    return { ok: true, data: { restoredCommit: "abc", revertedFiles: [], branch: "fix/refactor-xyz", clean: true } };
-  },
-  run_tests: async (params) => {
-    const runner = (params as any).runner || "jest";
-    return {
-      ok: true,
-      data: {
-        runId: "r1",
-        runner,
-        status: "passed",
-        complete: true,
-        exitCode: 0,
-        signal: null,
-        durationMs: 2450,
-        summary: "3 passed, 0 failed, 0 skipped",
-        cases: [{ id: "test1", status: "passed", title: "test1" }, { id: "test2", status: "passed", title: "test2" }],
-        stdout: "",
-        stderr: "",
-        outputTruncated: false,
-        fingerprint: "hash1",
-        configurationHash: "hash2",
-        createdAt: new Date().toISOString(),
-      },
-    };
-  },
-  compare_test_runs: async (params) => {
-    return {
-      ok: true,
-      data: {
-        baselineRunId: (params as any).baselineRunId,
-        candidateRunId: (params as any).candidateRunId,
-        comparable: true,
-        verdict: "success",
-        resolvedFailures: [],
-        newFailures: [],
-        missingTests: [],
-        message: "No regressions detected",
-      },
-    };
-  },
+  error?: { code: string; message: string; retryable?: boolean; details?: unknown };
 };
 
-function App() {
-  const [status, setStatus] = useState<{ [key: string]: string }>({});
-  const [results, setResults] = useState<Record<string, ToolResult>>({});
-  const [loading, setLoading] = useState<Record<string, boolean>>({});
+const DEFAULT_API_URL = "http://localhost:3000/api";
 
-  const executeTool = async (name: ToolName, params: Record<string, unknown>) => {
-    setLoading((prev) => ({ ...prev, [name]: true }));
-    setStatus((prev) => ({ ...prev, [name]: "running" }));
-    try {
-      const result = await handlerMap[name](params);
-      setResults((prev) => ({ ...prev, [name]: result }));
-      setStatus((prev) => ({ ...prev, [name]: result.ok ? "success" : "error" }));
-      if (!result.ok) {
-        alert(`Error: ${result.error?.message || "Unknown error"}`);
-      }
-    } catch (e: any) {
-      setResults((prev) => ({ ...prev, [name]: { ok: false, error: { code: "EXCEPTION", message: e.message } } }));
-      setStatus((prev) => ({ ...prev, [name]: "error" }));
-      alert(`Exception: ${e.message}`);
-    } finally {
-      setLoading((prev) => ({ ...prev, [name]: false }));
-    }
+const initialState = {
+  selectedTab: "code-inspector" as const,
+  resultDrawer: { visible: false, result: {} as ResultType, onClose: () => {} },
+  backendOk: false,
+};
+
+type AppState = typeof initialState;
+
+export default function App() {
+  const [state, setState] = useState<AppState>(initialState);
+  const [apiUrl, setApiUrl] = useState<string>(import.meta.env.VITE_API_URL || DEFAULT_API_URL);
+
+  // Verificar salud del backend al montar
+  useEffect(() => {
+    fetch(`${apiUrl}/health`)
+      .then((res) => res.json())
+      .then((data) => {
+        setState((s) => ({ ...s, backendOk: data.ok === true }));
+      })
+      .catch(() => setState((s) => ({ ...s, backendOk: false })));
+  }, [apiUrl]);
+
+  const openResultDrawer = (result: ResultType) => {
+    setState((s) => ({
+      ...s,
+      resultDrawer: { visible: true, result, onClose: () => setState((s2) => ({ ...s2, resultDrawer: { visible: false, result: {} as ResultType, onClose: () => {} } })) },
+    }));
   };
 
+  const closeResultDrawer = () =>
+    setState((s) => ({ ...s, resultDrawer: { visible: false, result: {} as ResultType, onClose: () => {} } }));
+
+  const tabs = [
+    { key: "code-inspector", label: "Inspector Código & AST" },
+    { key: "test-runner", label: "Runner Pruebas" },
+    { key: "git-control", label: "Control Git & Diffs" },
+    { key: "agent-monitor", label: "Monitor Agentes" },
+  ];
+
   return (
-    <div style={{ padding: "20px", fontFamily: "Arial, sans-serif" }}>
-      <h1 style={{ color: "#333" }}>
-        DevGuardian Frontend
-      </h1>
+    <div className="min-h-screen bg-gray-950 text-white font-sans">
+      {/* Header */}
+      <Header onLogout={() => alert("Logout")} />
 
-      <div style={{ marginBottom: "20px" }}>
-        <button
-          onClick={() => executeTool("git_status", {})}
-          style={{ marginRight: "10px", padding: "8px 16px" }}
-        >
-          Git Status
-        </button>
-        <button
-          onClick={() => executeTool("git_create_fix_branch", { slug: "refactor-xyz", expectedHead: "main" })}
-          style={{ marginRight: "10px", padding: "8px 16px" }}
-        >
-          Create Fix Branch
-        </button>
-        <button
-          onClick={() => executeTool("git_begin_attempt", { sessionId: "s1" })}
-          style={{ marginRight: "10px", padding: "8px 16px" }}
-        >
-          Begin Attempt
-        </button>
-        <button
-          onClick={() => executeTool("git_apply_patch", { sessionId: "s1", attemptId: "a1", unifiedDiff: "//diff", expectedFileHashes: {} })}
-          style={{ marginRight: "10px", padding: "8px 16px" }}
-        >
-          Apply Patch
-        </button>
-        <button
-          onClick={() => executeTool("git_commit_fix", { sessionId: "s1", attemptId: "a1", message: "Fix", expectedDiffHash: "xyz", verificationRunId: "r1" })}
-          style={{ marginRight: "10px", padding: "8px 16px" }}
-        >
-          Commit Fix
-        </button>
-        <button
-          onClick={() => executeTool("git_rollback_attempt", { sessionId: "s1", attemptId: "a1" })}
-          style={{ marginRight: "10px", padding: "8px 16px" }}
-        >
-          Rollback Attempt
-        </button>
-      </div>
-
-      <div style={{ marginBottom: "20px" }}>
-        <button
-          onClick={() => executeTool("run_tests", { runner: "jest", targets: ["src"], timeoutMs: 30000 })}
-          style={{ marginRight: "10px", padding: "8px 16px" }}
-        >
-          Run Tests (Jest)
-        </button>
-        <button
-          onClick={() => executeTool("run_tests", { runner: "pytest", targets: ["tests"], timeoutMs: 30000 })}
-          style={{ marginRight: "10px", padding: "8px 16px" }}
-        >
-          Run Tests (pytest)
-        </button>
-        <button
-          onClick={() => executeTool("compare_test_runs", { baselineRunId: "r1", candidateRunId: "r2" })}
-          style={{ marginRight: "10px", padding: "8px 16px" }}
-        >
-          Compare Test Runs
-        </button>
-      </div>
-
-      <div style={{ marginBottom: "20px" }}>
-        <button
-          onClick={() => executeTool("read_file_context", { path: "src/shared/contracts.ts", startLine: 1, endLine: 50 })}
-          style={{ marginRight: "10px", padding: "8px 16px" }}
-        >
-          Read File Context
-        </button>
-        <button
-          onClick={() => executeTool("analyze_code", { paths: ["src/shared/contracts.ts"], checks: ["syntax", "semantic"] })}
-          style={{ marginRight: "10x", padding: "8px 16px" }}
-        >
-          Analyze Code
-        </button>
-        <button
-          onClick={() => executeTool("get_symbol_context", { path: "src/shared/contracts.ts", line: 1 })}
-          style={{ marginRight: "10px", padding: "8px 16px" }}
-        >
-          Get Symbol Context
-        </button>
-      </div>
-
-      <h2>Results</h2>
-      <div>
-        {Object.entries(results).map(([name, result]) => (
-          <div key={name} style={{ marginBottom: "15px", border: "1px solid #ddd", borderRadius: "4px", padding: "10px" }}>
-            <h3 style={{ margin: "0 0 10px 0", color: "#555" }}>{name}</h3>
-            {result.ok ? (
-              <pre style={{ whiteSpace: "pre-wrap", margin: "0" }}>{JSON.stringify(result.data, null, 2)}</pre>
-            ) : (
-              <div style={{ color: "red", margin: "10px 0" }}>
-                <strong>Error:</strong> {result.error?.message}
+      {/* Main content area */}
+      <main className="max-w-7xl mx-auto p-4">
+        {/* Tabs navigation - wrapped in single div to avoid adjacent JSX */}
+        <div className="bg-gray-900/50 rounded-lg mb-6 overflow-x-auto">
+          <div className="flex border-b border-gray-700">
+            {tabs.map((tab) => (
+              <div
+                key={tab.key}
+                className={state.selectedTab === tab.key.key
+                  ? "flex-1 bg-indigo-600 text-white px-4 py-2 rounded-l-lg border-b-2 border-indigo-600 font-medium"
+                  : "flex-1 text-gray-300 hover:text-white px-4 py-2 rounded-l-lg hover:bg-gray-700 border-b-2 border-transparent transition-colors"}
+              >
+                {tab.label}
               </div>
-            )}
+            ))}
           </div>
-        ))}
-      </div>
+        </div>
+
+        {/* Content by tab */}
+        <div className="space-y-6">
+          {state.selectedTab === "code-inspector" && (
+            <CodeInspector
+              onResult={(result: ResultType) => openResultDrawer(result)}
+              backendOk={state.backendOk}
+            />
+          )}
+
+          {state.selectedTab === "test-runner" && (
+            <TestRunnerView
+              onResult={(result: ResultType) => openResultDrawer(result)}
+              backendOk={state.backendOk}
+            />
+          )}
+
+          {state.selectedTab === "git-control" && (
+            <GitControlView
+              onResult={(result: ResultType) => openResultDrawer(result)}
+              backendOk={state.backendOk}
+            />
+          )}
+
+          {state.selectedTab === "agent-monitor" && (
+            <AgentMonitorView
+              onResult={(result: ResultType) => openResultDrawer(result)}
+              backendOk={state.backendOk}
+            />
+          )}
+        </div>
+
+        {/* Panel ResultDrawer siempre visible cuando está abierto */}
+        {state.resultDrawer.visible && (
+          <ResultDrawer
+            visible={state.resultDrawer.visible}
+            result={state.resultDrawer.result}
+            onClose={closeResultDrawer}
+          />
+        )}
+      </main>
     </div>
   );
 }
-
-export default App;

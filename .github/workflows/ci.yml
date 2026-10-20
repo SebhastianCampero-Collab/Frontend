@@ -1,6 +1,6 @@
 name: CI Frontend - DevGuardian
 
-on: 
+on:
   push:
     branches: [ "main", "dev", "Dev" ]
   pull_request:
@@ -9,6 +9,7 @@ on:
 jobs:
   build-and-lint:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout del repositorio
         uses: actions/checkout@v4
@@ -22,8 +23,5 @@ jobs:
       - name: Instalar dependencias
         run: npm install
 
-      - name: Verificar tipos (TypeScript / Vite check)
-        run: npx tsc --noEmit
-
-      - name: Compilar el proyecto (Build de producción)
+      - name: Compilar y verificar tipos (Build de producción)
         run: npm run build
