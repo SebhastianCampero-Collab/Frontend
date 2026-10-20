@@ -1,0 +1,29 @@
+name: CI Frontend - DevGuardian
+
+on: 
+  push:
+    branches: [ "main", "dev", "Dev" ]
+  pull_request:
+    branches: [ "main", "dev", "Dev" ]
+
+jobs:
+  build-and-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout del repositorio
+        uses: actions/checkout@v4
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Instalar dependencias
+        run: npm install
+
+      - name: Verificar tipos (TypeScript / Vite check)
+        run: npx tsc --noEmit
+
+      - name: Compilar el proyecto (Build de producción)
+        run: npm run build
