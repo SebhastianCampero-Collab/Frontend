@@ -1,27 +1,32 @@
-name: CI Frontend - DevGuardian
-
+name: Frontend CI
 on:
   push:
-    branches: [ "main", "dev", "Dev" ]
+    branches: [main, dev, Dev]
   pull_request:
-    branches: [ "main", "dev", "Dev" ]
-
+    branches: [main, dev, Dev]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
 jobs:
-  build-and-lint:
+  validate:
     runs-on: ubuntu-latest
-
+    timeout-minutes: 10
     steps:
-      - name: Checkout del repositorio
-        uses: actions/checkout@v4
-
-      - name: Configurar Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v4
         with:
-          node-version: '20'
-          cache: 'npm'
-
-      - name: Instalar dependencias
-        run: npm install
-
-      - name: Compilar y verificar tipos (Build de producción)
-        run: npm run build
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.x'
+          cache: npm
+      - run: npm ci
+      - run: npm run check
+      - run: npm test
+      - run: npm run build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist
+          path: dist

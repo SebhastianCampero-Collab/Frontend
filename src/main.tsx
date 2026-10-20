@@ -1,7 +1,8 @@
-import { createRoot } from "react-dom/client";
-import App from "./App.tsx";
-import index from "./index.css"
+import { createRoot } from 'react-dom/client';
+import App from './App';
+import './index.css';
 
-const container = document.getElementById("root") as HTMLElement;
+const container = document.getElementById('root');
+if (!container) throw new Error('No se encontró el contenedor de la aplicación.');
 const root = createRoot(container);
 root.render(<App />);

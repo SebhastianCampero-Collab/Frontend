@@ -1,138 +1,299 @@
-import { useState, useEffect } from "react";
-import { Header } from "./components/Header";
-import { CodeInspector } from "./components/CodeInspector";
-import { TestRunnerView } from "./components/TestRunnerView";
-import { GitControlView } from "./components/GitControlView";
-import { AgentMonitorView } from "./components/AgentMonitorView";
-import { ResultDrawer } from "./components/ResultDrawer";
+import { useState } from 'react';
+import {
+  ShieldCheck,
+  LayoutDashboard,
+  Workflow,
+  Braces,
+  Plus,
+  Activity,
+  Terminal,
+  KeyRound,
+  FolderGit2,
+  ArrowUpRight,
+} from 'lucide-react';
+import { api, API_URL } from './api/client';
+import { useServerHealth } from './hooks/useServerHealth';
+import { useProjects } from './hooks/useProjects';
+import { Header } from './components/Header';
+import { ProjectsPanel } from './components/ProjectsPanel';
+import { AuditPanel } from './components/AuditPanel';
+import { GuardrailsPanel } from './components/GuardrailsPanel';
+import { AgentMonitorView } from './components/AgentMonitorView';
+import { McpPanel } from './components/McpPanel';
+import { Empty, ErrorNotice } from './components/ui';
 
-type ResultType = {
-  ok: boolean;
-  data?: unknown;
-  error?: { code: string; message: string; retryable?: boolean; details?: unknown };
-};
-
-const DEFAULT_API_URL = "http://localhost:3000/api";
-
-const initialState = {
-  selectedTab: "code-inspector" as "code-inspector" | "test-runner" | "git-control" | "agent-monitor",
-  resultDrawer: { visible: false, result: {} as ResultType, onClose: () => { } },
-  backendOk: false,
-};
-
-type AppState = typeof initialState;
+const tabs = [
+  { id: 'audit', label: 'Auditoría', icon: LayoutDashboard, number: '01' },
+  { id: 'hooks', label: 'Hooks & Guardrails', icon: ShieldCheck, number: '02' },
+  { id: 'agents', label: 'Subagentes', icon: Workflow, number: '03' },
+  { id: 'mcp', label: 'Catálogo MCP', icon: Braces, number: '04' },
+] as const;
+type Tab = (typeof tabs)[number]['id'];
+function rememberedProject(): string {
+  try {
+    return localStorage.getItem('devguardian.project') ?? '';
+  } catch {
+    return '';
+  }
+}
 
 export default function App() {
-  const [state, setState] = useState<AppState>(initialState);
-  const [, setApiUrl] = useState<string>((import.meta as any).env?.VITE_API_URL || DEFAULT_API_URL);
-
-  // Verificar salud del backend al montar
-  useEffect(() => {
-    const activeApiUrl = (import.meta as any).env?.VITE_API_URL || DEFAULT_API_URL;
-    setApiUrl(activeApiUrl);
-
-    fetch(`${activeApiUrl}/health`)
-      .then((res) => res.json())
-      .then((data) => {
-        setState((s) => ({ ...s, backendOk: data.ok === true }));
-      })
-      .catch(() => setState((s) => ({ ...s, backendOk: false })));
-  }, []);
-
-  const openResultDrawer = (result: ResultType) => {
-    setState((s) => ({
-      ...s,
-      resultDrawer: {
-        visible: true,
-        result,
-        onClose: () =>
-          setState((s2) => ({
-            ...s2,
-            resultDrawer: { visible: false, result: {} as ResultType, onClose: () => { } },
-          })),
-      },
-    }));
+  const health = useServerHealth();
+  const projects = useProjects();
+  const [selectedId, setSelectedId] = useState(rememberedProject);
+  const [tab, setTab] = useState<Tab>('audit');
+  const [registering, setRegistering] = useState(false);
+  const [revision, setRevision] = useState(0);
+  const [token, setToken] = useState('');
+  const [tokenSet, setTokenSet] = useState(false);
+  const project = projects.data?.find((item) => item.id === selectedId) ?? projects.data?.[0];
+  const selectProject = (id: string) => {
+    setSelectedId(id);
+    try {
+      localStorage.setItem('devguardian.project', id);
+    } catch {
+      /* Selection remains available in memory. */
+    }
   };
-
-  const closeResultDrawer = () =>
-    setState((s) => ({
-      ...s,
-      resultDrawer: { visible: false, result: {} as ResultType, onClose: () => { } },
-    }));
-
-  const tabs = [
-    { key: "code-inspector", label: "Inspector Código & AST" },
-    { key: "test-runner", label: "Runner Pruebas" },
-    { key: "git-control", label: "Control Git & Diffs" },
-    { key: "agent-monitor", label: "Monitor Agentes" },
-  ] as const;
-
+  const refresh = () => {
+    health.refresh();
+    projects.refresh();
+    setRevision((value) => value + 1);
+  };
   return (
-    <div className="min-h-screen bg-gray-950 text-white font-sans">
-      {/* Header */}
-      <Header onLogout={() => alert("Logout")} />
-
-      {/* Main content area */}
-      <main className="max-w-7xl mx-auto p-4">
-        {/* Tabs navigation */}
-        <div className="bg-gray-900/50 rounded-lg mb-6 overflow-x-auto border border-gray-800">
-          <div className="flex border-b border-gray-700">
-            {tabs.map((tab) => (
-              <button
-                key={tab.key}
-                onClick={() => setState((s) => ({ ...s, selectedTab: tab.key }))}
-                className={
-                  state.selectedTab === tab.key
-                    ? "flex-1 bg-indigo-600 text-white px-4 py-3 font-medium transition-colors text-sm text-center"
-                    : "flex-1 text-gray-300 hover:text-white px-4 py-3 hover:bg-gray-800 transition-colors text-sm text-center"
-                }
-              >
-                {tab.label}
-              </button>
-            ))}
+    <div className="app-shell">
+      <a className="skip-link" href="#main-content">
+        Saltar al contenido
+      </a>
+      <aside className="sidebar">
+        <a className="brand" href="#main-content">
+          <span className="brand-mark">
+            <ShieldCheck size={25} />
+          </span>
+          <div>
+            DevGuardian<small>ENGINEERING CONTROL</small>
+          </div>
+        </a>
+        <div className="workspace-label">
+          SIX SEVEN <span>WORKSPACE</span>
+        </div>
+        <nav aria-label="Navegación principal">
+          {tabs.map((item) => (
+            <button
+              key={item.id}
+              className={tab === item.id ? 'nav-item active' : 'nav-item'}
+              aria-current={tab === item.id ? 'page' : undefined}
+              onClick={() => setTab(item.id)}
+            >
+              <item.icon size={18} />
+              <span>{item.label}</span>
+              <small>{item.number}</small>
+            </button>
+          ))}
+        </nav>
+        <div className="sidebar-note">
+          <Terminal size={20} />
+          <strong>Verificar antes de confirmar.</strong>
+          <p>Diagnóstico, pruebas y evidencia en un solo lugar.</p>
+        </div>
+        <div className="sidebar-footer">
+          <span className={`status-dot ${health.connected ? 'live' : ''}`} />
+          <div>
+            {health.connected ? 'Sistema disponible' : 'Esperando al backend'}
+            <small>
+              v{health.data?.version ?? '—'} · {project?.runnerType ?? 'sin proyecto'}
+            </small>
           </div>
         </div>
-
-        {/* Content by tab */}
-        <div className="space-y-6">
-          {state.selectedTab === "code-inspector" && (
-            <CodeInspector
-              onResult={(result: ResultType) => openResultDrawer(result)}
-              backendOk={state.backendOk}
+      </aside>
+      <div className="workspace">
+        <Header
+          health={health.data}
+          connected={health.connected}
+          refreshing={health.loading || projects.loading}
+          onRefresh={refresh}
+        />
+        <main id="main-content">
+          <section className="hero">
+            <div>
+              <div className="eyebrow">
+                <span className="status-dot live" />
+                DEVSECOPS / CENTRO DE CONTROL
+              </div>
+              <h1>
+                Código bajo control.
+                <br />
+                <span>Reparaciones con evidencia.</span>
+              </h1>
+              <p>
+                Diagnostica, verifica y sigue cada decisión del sistema.
+                <br className="desktop-break" />
+                Del primer hallazgo al commit seguro.
+              </p>
+            </div>
+            <div className="hero-emblem" aria-hidden="true">
+              <div className="orbit orbit-one" />
+              <div className="orbit orbit-two" />
+              <ShieldCheck size={69} strokeWidth={1.15} />
+              <span>VALIDATE. VERIFY. PROTECT.</span>
+            </div>
+          </section>
+          <div className="metric-grid">
+            <div className="metric">
+              <span>
+                <Activity size={16} />
+                BACKEND
+              </span>
+              <strong>{health.connected ? 'Operativo' : 'No disponible'}</strong>
+              <small>{API_URL}</small>
+            </div>
+            <div className="metric">
+              <span>
+                <FolderGit2 size={16} />
+                PROYECTOS
+              </span>
+              <strong>
+                {projects.data?.length ?? '—'}
+                <em>registrados</em>
+              </strong>
+              <small>Consultados desde la base de datos</small>
+            </div>
+            <div className="metric">
+              <span>
+                <ShieldCheck size={16} />
+                PERSISTENCIA
+              </span>
+              <strong>
+                {health.data
+                  ? health.data.database.mode === 'postgres'
+                    ? 'PostgreSQL'
+                    : 'Local JSON'
+                  : 'Sin verificar'}
+              </strong>
+              <small>
+                {health.data
+                  ? `${health.data.database.tables} entidades · ${Math.floor(health.data.uptimeSeconds / 60)} min de uptime`
+                  : 'Esperando respuesta de health'}
+              </small>
+            </div>
+          </div>
+          <ErrorNotice error={health.error ?? projects.error} />
+          {health.data && !health.data.database.connected && (
+            <ErrorNotice error="El backend responde, pero la base de datos no está disponible." />
+          )}
+          <section className="project-toolbar">
+            <div className="project-picker">
+              <FolderGit2 size={19} />
+              <label>
+                PROYECTO ACTIVO
+                <select
+                  aria-label="Proyecto activo"
+                  value={project?.id ?? ''}
+                  onChange={(event) => selectProject(event.target.value)}
+                  disabled={!projects.data?.length}
+                >
+                  {!projects.data?.length && <option value="">Sin proyectos registrados</option>}
+                  {projects.data?.map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.name} · {item.defaultBranch}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+            <button
+              className="ghost"
+              onClick={() => setRegistering((value) => !value)}
+              aria-expanded={registering}
+            >
+              <Plus size={16} />
+              {registering ? 'Cerrar registro' : 'Registrar proyecto'}
+            </button>
+          </section>
+          {project && (
+            <div className="repo-path">
+              <code>{project.repoPath}</code>
+              <span>
+                workspace del backend <ArrowUpRight size={12} />
+              </span>
+            </div>
+          )}
+          {registering && (
+            <ProjectsPanel
+              register={projects.register}
+              pending={projects.registering}
+              error={projects.registerError}
+              onRegistered={(id) => {
+                selectProject(id);
+                setRegistering(false);
+              }}
             />
           )}
-
-          {state.selectedTab === "test-runner" && (
-            <TestRunnerView
-              onResult={(result: ResultType) => openResultDrawer(result)}
-              backendOk={state.backendOk}
-            />
-          )}
-
-          {state.selectedTab === "git-control" && (
-            <GitControlView
-              onResult={(result: ResultType) => openResultDrawer(result)}
-              backendOk={state.backendOk}
-            />
-          )}
-
-          {state.selectedTab === "agent-monitor" && (
-            <AgentMonitorView
-              onResult={(result: ResultType) => openResultDrawer(result)}
-              backendOk={state.backendOk}
-            />
-          )}
-        </div>
-
-        {/* Panel ResultDrawer siempre visible cuando está abierto */}
-        {state.resultDrawer.visible && (
-          <ResultDrawer
-            visible={state.resultDrawer.visible}
-            result={state.resultDrawer.result}
-            onClose={closeResultDrawer}
-          />
-        )}
-      </main>
+          <div key={`${project?.id ?? 'none'}-${tab}-${revision}`}>
+            {project ? (
+              tab === 'audit' ? (
+                <AuditPanel project={project} />
+              ) : tab === 'hooks' ? (
+                <GuardrailsPanel projectId={project.id} />
+              ) : tab === 'agents' ? (
+                <AgentMonitorView projectId={project.id} />
+              ) : (
+                <McpPanel projectId={project.id} />
+              )
+            ) : (
+              <section className="panel">
+                <Empty>
+                  {projects.loading
+                    ? 'Cargando proyectos…'
+                    : 'Registra un repositorio para comenzar. El dashboard no genera registros ni resultados simulados.'}
+                </Empty>
+                <button className="primary" onClick={() => setRegistering(true)}>
+                  Registrar primer proyecto
+                </button>
+              </section>
+            )}
+          </div>
+          <details className="connection-settings">
+            <summary>
+              <KeyRound size={14} />
+              Conexión y autenticación
+            </summary>
+            <p>
+              URL de compilación: <code>{API_URL}</code>. El token opcional se conserva solo en
+              memoria y nunca se incluye en el bundle ni en localStorage.
+            </p>
+            <form
+              onSubmit={(event) => {
+                event.preventDefault();
+                api.setToken(token);
+                setTokenSet(Boolean(token.trim()));
+                setToken('');
+                refresh();
+              }}
+            >
+              <label>
+                Bearer token
+                <input
+                  type="password"
+                  autoComplete="off"
+                  value={token}
+                  onChange={(event) => setToken(event.target.value)}
+                  placeholder="Solo si tu backend lo requiere"
+                />
+              </label>
+              <button className="ghost">Aplicar token</button>
+            </form>
+            <small>
+              {tokenSet ? 'Token configurado para esta sesión.' : 'Sin token configurado.'} Para
+              retirarlo, envía el campo vacío.
+            </small>
+          </details>
+          <footer className="page-footer">
+            <span>DevGuardian · Six seven</span>
+            <span>Datos reales. Decisiones trazables.</span>
+          </footer>
+        </main>
+      </div>
     </div>
   );
 }

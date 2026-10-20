@@ -1,0 +1,70 @@
+import type { ReactNode } from 'react';
+export function Badge({ value }: { value: string }) {
+  const tone = [
+    'allow',
+    'allowed',
+    'passed',
+    'committed',
+    'completed',
+    'success',
+    'ready_to_commit',
+    'diagnosed',
+    'tool_completed',
+  ].includes(value)
+    ? 'good'
+    : ['block', 'blocked', 'failed', 'regression', 'rejected', 'error'].includes(value)
+      ? 'bad'
+      : 'neutral';
+  return <span className={`badge ${tone}`}>{value.toUpperCase().replaceAll('_', ' ')}</span>;
+}
+export function ErrorNotice({ error }: { error: string | null | undefined }) {
+  return error ? (
+    <div className="notice danger" role="alert">
+      {error}
+    </div>
+  ) : null;
+}
+export function Empty({ children }: { children: ReactNode }) {
+  return <div className="empty">{children}</div>;
+}
+export function JsonDetails({
+  value,
+  label = 'Ver evidencia JSON',
+}: {
+  value: unknown;
+  label?: string;
+}) {
+  return (
+    <details className="json-details">
+      <summary>{label}</summary>
+      <pre>{JSON.stringify(value, null, 2)}</pre>
+    </details>
+  );
+}
+export function Pagination({
+  offset,
+  count,
+  onChange,
+}: {
+  offset: number;
+  count: number;
+  onChange: (offset: number) => void;
+}) {
+  return (
+    <div className="pagination">
+      <span>
+        Registros {count ? offset + 1 : 0}–{offset + count}
+      </span>
+      <button
+        className="ghost"
+        disabled={offset === 0}
+        onClick={() => onChange(Math.max(0, offset - 20))}
+      >
+        Anterior
+      </button>
+      <button className="ghost" disabled={count < 20} onClick={() => onChange(offset + 20)}>
+        Siguiente
+      </button>
+    </div>
+  );
+}
