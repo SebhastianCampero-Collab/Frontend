@@ -647,6 +647,14 @@ main {
 .primary:hover {
   background: #cdf6d7;
 }
+.form-footer > .primary {
+  background: #facc15;
+  border-color: #fde047;
+  color: #302500;
+}
+.form-footer > .primary:hover {
+  background: #fde047;
+}
 .ghost {
   color: #c1d3c7;
   background: #18251d;
