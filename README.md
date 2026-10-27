@@ -13,17 +13,17 @@
 
 Los secretos se configuran en Environment de Render. Las copias locales `.env` están ignoradas por Git; nunca publicar DATABASE_URL ni claves en variables VITE_*.
 
-### Demo en vivo en tres clics
+### Flujo principal con un repositorio real
 
-1. En Auditoría, **Cargar Demo Reparación / Subagentes**. Se crea y registra un checkout nuevo con fallo real, rama inicial Dev, parche y SHA-256 calculado en el servidor.
-2. **Ejecutar reparación**. Esperar COMMITTED: diagnóstico en worker, baseline con un fallo y un aprobado, candidato con dos aprobados, hooks y commit en fix/… del checkout de demo.
-3. **Subagentes**. Mostrar las delegaciones diagnostic/verification y su consumo committed. El selector conserva el proyecto de demo; F5 recupera auditoría, pruebas y trazas de PCAI.
+1. Pulsar **Registrar proyecto**, pegar el enlace público de GitHub y elegir **Importar y preparar**.
+2. Revisar el progreso y la compatibilidad. Al terminar se selecciona el proyecto y un archivo real para **Ejecutar diagnóstico**.
+3. Consultar los hallazgos y las delegaciones del diagnóstico en el historial. La importación habilita análisis estático; la reparación con pruebas requiere un entorno aislado.
 
-Para diagnóstico independiente: **Cargar Demo Diagnóstico Real → Ejecutar diagnóstico**. El resultado DIAGNOSED conserva outcome=diagnosed y traza completed; la sesión DB mantiene status=blocked por el contrato histórico, pues diagnosticar no autoriza un commit. No es un error.
+El resultado DIAGNOSED conserva outcome=diagnosed y traza completed; la sesión DB mantiene status=blocked por el contrato histórico, pues diagnosticar no autoriza un commit. No es un error.
 
 En **Hooks & Guardrails**, ejecutar **Probar ALLOW** y **Probar BLOCK · .env**. Son preflights reales: guardan evidencia y no modifican archivos. Recargar para comprobar persistencia. No se borran registros fallidos anteriores.
 
-La preparación usa POST /api/demo/prepare con cuerpo vacío; no acepta rutas ni comandos del navegador. Está habilitada en Render o con DEVGUARDIAN_ENABLE_DEMO=1 y limitada a 20 checkouts por proceso. Cada repetición usa un proyecto distinto: nunca restaura ni elimina trabajo previo. Los checkouts son efímeros al redesplegar; las auditorías permanecen en PCAI. Para repetir tras reinicio, cargar una nueva demo. La plantilla fixtures/cloud-demo queda fuera del build y de la suite principal; sus dos casos Jest se ejecutan contra la fuente real al reparar.
+El dashboard ya no ofrece botones de carga de demos ni selecciona proyectos de ejemplo automáticamente. Los registros generados con el prefijo reservado `Demo Render ` o ubicados bajo `.devguardian-demo/` quedan ocultos del selector y del contador principal. Se conservan en la BD junto con su historial, sin eliminarlos. El endpoint técnico `/api/demo/prepare` del backend no se modifica ni se invoca desde el dashboard.
 
 
 [![Frontend CI](https://github.com/SebhastianCampero-Collab/Frontend/actions/workflows/ci.yml/badge.svg?branch=dev)](https://github.com/SebhastianCampero-Collab/Frontend/actions/workflows/ci.yml)

@@ -22,9 +22,7 @@ import { GuardrailsPanel } from './components/GuardrailsPanel';
 import { AgentMonitorView } from './components/AgentMonitorView';
 import { McpPanel } from './components/McpPanel';
 import { Empty, ErrorNotice } from './components/ui';
-import { DemoPresets } from './components/DemoPresets';
-import { useAction } from './hooks/useResource';
-import type { DemoSetup, ImportReady } from './types/contracts';
+import type { ImportReady } from './types/contracts';
 
 const tabs = [
   { id: 'audit', label: 'Auditoría', icon: LayoutDashboard, number: '01' },
@@ -51,20 +49,11 @@ export default function App() {
   const [revision, setRevision] = useState(0);
   const [token, setToken] = useState('');
   const [tokenSet, setTokenSet] = useState(false);
-  const demo = useAction<DemoSetup>();
-  const [demoMode, setDemoMode] = useState<'diagnose' | 'repair'>('diagnose');
-  const visibleProjects = [...(projects.data ?? [])];
+  const visibleProjects = (projects.data ?? []).filter((item) =>
+    !item.name.startsWith('Demo Render ') && !item.repoPath.replaceAll('\\', '/').split('/').includes('.devguardian-demo'),
+  );
   if (imported && !visibleProjects.some((item) => item.id === imported.project.id)) visibleProjects.push(imported.project);
-  if (demo.data && !visibleProjects.some((item) => item.id === demo.data?.project.id))
-    visibleProjects.push(demo.data.project);
-  const project =
-    (imported?.project.id === selectedId ? imported.project : undefined) ??
-    (demo.data?.project.id === selectedId ? demo.data.project : undefined) ??
-    projects.data?.find((item) => item.id === selectedId) ??
-    projects.data
-      ?.filter((item) => item.name.startsWith('Demo Render '))
-      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0] ??
-    projects.data?.[0];
+  const project = visibleProjects.find((item) => item.id === selectedId) ?? visibleProjects[0];
   const selectProject = (id: string) => {
     setSelectedId(id);
     try {
@@ -78,15 +67,6 @@ export default function App() {
     projects.refresh();
     setRevision((value) => value + 1);
   };
-  const prepareDemo = async (mode: 'diagnose' | 'repair') => {
-    const setup = await demo.execute(() => api.prepareDemo());
-    setDemoMode(mode);
-    selectProject(setup.project.id);
-    projects.refresh();
-  };
-  const demoControls = (
-    <DemoPresets prepare={prepareDemo} pending={demo.pending} error={demo.error} />
-  );
   return (
     <div className="app-shell">
       <a className="skip-link" href="#main-content">
@@ -180,7 +160,7 @@ export default function App() {
                 PROYECTOS
               </span>
               <strong>
-                {projects.data?.length ?? '—'}
+                {projects.data ? visibleProjects.length : '—'}
                 <em>registrados</em>
               </strong>
               <small>Consultados desde la base de datos</small>
@@ -272,10 +252,6 @@ export default function App() {
                 <AuditPanel
                   project={project}
                   {...(imported?.project.id === project.id && imported.validation.entryFile ? { initialPath: imported.validation.entryFile } : {})}
-                  demoControls={demoControls}
-                  {...(demo.data?.project.id === project.id
-                    ? { initialRepair: demo.data.repair, initialMode: demoMode }
-                    : {})}
                 />
               ) : tab === 'hooks' ? (
                 <GuardrailsPanel projectId={project.id} />
@@ -286,7 +262,6 @@ export default function App() {
               )
             ) : (
               <section className="panel">
-                {tab === 'audit' && demoControls}
                 <Empty>
                   {projects.loading
                     ? 'Cargando proyectos…'

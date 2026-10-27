@@ -10,48 +10,28 @@ import { ProjectsPanel } from '../src/components/ProjectsPanel';
 import { config, delegation, details, diagnosed, health, log, project, tools } from './fixtures';
 
 describe('dashboard views', () => {
-  it('loads a server-owned demo with a fresh hash and executes the explicit repair', async () => {
+  it('hides stored demo projects and buttons even when a demo was the remembered selection', async () => {
     vi.spyOn(api, 'health').mockResolvedValue(health);
-    vi.spyOn(api, 'projects').mockResolvedValue([project]);
     vi.spyOn(api, 'audits').mockResolvedValue([]);
-    const demoProject = {
-      ...project,
-      id: '33333333-3333-4333-8333-333333333333',
-      name: 'Demo Render real',
-      defaultBranch: 'Dev',
-    };
-    const repair = {
-      path: 'src/target-bug.ts',
-      slug: 'cloud-demo-real',
-      message: 'fix: demo',
-      runner: 'jest' as const,
-      targets: ['tests/target-bug.test.cjs'],
-      expectedFileHashes: { 'src/target-bug.ts': 'b'.repeat(64) },
-      unifiedDiff: 'diff --git a/src/target-bug.ts b/src/target-bug.ts\n',
-    };
-    vi.spyOn(api, 'prepareDemo').mockResolvedValue({ project: demoProject, repair });
-    const run = vi.spyOn(api, 'runAudit').mockResolvedValue({ ...diagnosed, project: demoProject });
-    const initialView = render(<App />);
-    await screen.findByText('Backend conectado');
-    fireEvent.click(
-      await screen.findByRole('button', { name: 'Cargar Demo Reparación / Subagentes' }),
-    );
-    await waitFor(() =>
-      expect(screen.getByLabelText('Archivo dentro del proyecto')).toHaveValue(repair.path),
-    );
-    expect(screen.getByLabelText('SHA-256 esperado')).toHaveValue('b'.repeat(64));
-    expect(screen.getByLabelText(/Targets de jest/)).toHaveValue('tests/target-bug.test.cjs');
-    expect(screen.getByLabelText('Proyecto activo')).toHaveValue(demoProject.id);
-    fireEvent.click(screen.getByRole('button', { name: 'Ejecutar reparación' }));
-    await waitFor(() =>
-      expect(run).toHaveBeenCalledWith({ projectId: demoProject.id, mode: 'repair', repair }),
-    );
-    initialView.unmount();
-    vi.spyOn(api, 'projects').mockResolvedValue([demoProject]);
+    const demoProject = { ...project, id: '33333333-3333-4333-8333-333333333333', name: 'Demo Render real' };
+    const renamedDemo = { ...project, id: '44444444-4444-4444-8444-444444444444', name: 'Renamed example', repoPath: 'C:\\workspace\\.devguardian-demo\\session-123' };
+    vi.spyOn(api, 'projects').mockResolvedValue([demoProject, renamedDemo, project]);
+    const prepare = vi.spyOn(api, 'prepareDemo');
+    localStorage.setItem('devguardian.project', demoProject.id);
     render(<App />);
-    await waitFor(() =>
-      expect(screen.getByLabelText('Archivo dentro del proyecto')).toHaveValue(repair.path),
-    );
+    await waitFor(() => expect(screen.getByLabelText('Proyecto activo')).toHaveValue(project.id));
+    expect(within(screen.getByLabelText('Proyecto activo')).getAllByRole('option')).toHaveLength(1);
+    expect(screen.queryByRole('button', { name: /Cargar Demo/ })).not.toBeInTheDocument();
+    expect(screen.queryByText(/Demo real: crea un checkout/)).not.toBeInTheDocument();
+    expect(prepare).not.toHaveBeenCalled();
+  });
+  it('opens GitHub import when the database contains only demo projects', async () => {
+    vi.spyOn(api, 'health').mockResolvedValue(health);
+    vi.spyOn(api, 'projects').mockResolvedValue([{ ...project, name: 'Demo Render real' }]);
+    render(<App />);
+    expect(await screen.findByLabelText('Enlace de GitHub')).toBeInTheDocument();
+    expect(screen.getByLabelText('Proyecto activo')).toBeDisabled();
+    expect(screen.queryByRole('button', { name: /Cargar Demo/ })).not.toBeInTheDocument();
   });
   it('does not label a failed diagnosis as a successful read-only diagnosis', async () => {
     vi.spyOn(api, 'audits').mockResolvedValue([]);
