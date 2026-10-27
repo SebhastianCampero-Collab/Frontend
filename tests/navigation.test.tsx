@@ -41,6 +41,7 @@ describe('simple workspace navigation', () => {
     open('/results'); render(<App />);
     await screen.findByText('Type string is not assignable to number');
     fireEvent.click(screen.getByRole('button', { name: 'Opciones avanzadas' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Detalles técnicos' }));
     expect(screen.getByText('Respuesta completa recuperable desde la BD')).toBeInTheDocument();
     expect(screen.getByText('Commit SHA')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Opciones avanzadas' }));

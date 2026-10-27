@@ -1,5 +1,7 @@
 # DevGuardian · Dashboard de operaciones
 
+Los resultados comienzan con una explicación en lenguaje claro y accesos a pruebas, cambios y detalles técnicos. Ver [Resultados comprensibles](RESULTADOS_COMPRENSIBLES.md).
+
 La selección de archivos reales, los checks de revisión y la consulta por líneas se explican en [Formularios de archivos](FORMULARIOS_ARCHIVOS.md). Los formularios generan el JSON internamente y solo lo muestran al activar las opciones avanzadas.
 
 La navegación principal se divide en **Mis proyectos**, **Revisar código** y **Resultados e historial**. Las herramientas técnicas se agrupan bajo **Opciones avanzadas**. Ver [estructura del layout, rutas y garantías de seguridad](LAYOUT_Y_RUTAS.md).

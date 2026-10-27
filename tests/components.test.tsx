@@ -46,6 +46,7 @@ describe('dashboard views', () => {
     });
     render(<AuditPanel project={project} initialPath="src/bug.ts" />);
     fireEvent.click(screen.getByRole('button', { name: 'Revisar código' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Detalles técnicos' }));
     await screen.findByText('Estado persistido');
     expect(
       screen.queryByText(/Diagnóstico sin autorización de reparación/),
@@ -101,16 +102,17 @@ describe('dashboard views', () => {
       path: 'src/bug.ts',
       checks: ['syntax', 'semantic', 'lint'],
     });
+    fireEvent.click(screen.getByRole('button', { name: 'Detalles técnicos' }));
     expect(screen.getByText(/Diagnóstico sin autorización de reparación/)).toBeInTheDocument();
   });
   it('restores audit details after unmount/reload from the durable API', async () => {
     vi.spyOn(api, 'audits').mockResolvedValue([details]);
     const audit = vi.spyOn(api, 'audit').mockResolvedValue(details);
     const first = render(<AuditPanel project={project} />);
-    await screen.findByRole('button', { name: /DIAGNOSED/ });
+    await screen.findByRole('button', { name: /Análisis terminado/ });
     first.unmount();
     render(<AuditPanel project={project} />);
-    fireEvent.click(await screen.findByRole('button', { name: /DIAGNOSED/ }));
+    fireEvent.click(await screen.findByRole('button', { name: /Análisis terminado/ }));
     await screen.findByText('Type string is not assignable to number');
     expect(audit).toHaveBeenCalledWith(details.audit.id);
   });
@@ -148,7 +150,7 @@ describe('dashboard views', () => {
         runner: 'jest',
         targets: ['tests/bug.test.cjs'],
       });
-    await screen.findAllByText('ROLLED BACK');
+    await screen.findAllByText('Cambio revertido porque no superó la verificación');
   });
   it('blocks malformed repair input locally before any audit mutation', async () => {
     vi.spyOn(api, 'audits').mockResolvedValue([]);

@@ -13,8 +13,7 @@ import { FileSelector } from './FileSelector';
 import { FileReader } from './FileReader';
 import { TechnicalRequest } from './TechnicalRequest';
 import { CodeInspector } from './CodeInspector';
-import { TestRunnerView } from './TestRunnerView';
-import { GitControlView } from './GitControlView';
+import { ResultResponse } from './ResultResponse';
 import { useAdvancedOptions } from './AdvancedOptions';
 import { Badge, Empty, ErrorNotice, Pagination } from './ui';
 
@@ -259,9 +258,8 @@ export function AuditPanel({
         {view !== 'results' && <FileReader projectId={project.id} files={files.data} loading={files.loading} error={files.error} refresh={files.refresh} />}
         {view !== 'review' && audit.details && (
           <>
-            <GitControlView details={audit.details} />
+            <ResultResponse key={audit.details.audit.id} details={audit.details} />
             <CodeInspector details={audit.details} />
-            {(advanced || audit.details.testRuns.length > 0) ? <TestRunnerView details={audit.details} /> : <p className="notice">Esta revisión no ejecutó pruebas ni realizó reparaciones.</p>}
           </>
         )}
         {view === 'results' && !audit.details && <Empty>{audit.history.error ? 'No se pudieron recuperar los resultados. Reintenta desde el historial.' : audit.history.loading ? 'Consultando resultados…' : 'Todavía no hay resultados. Ve a Revisar código para iniciar un diagnóstico.'}</Empty>}

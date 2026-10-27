@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { useAdvancedOptions } from './AdvancedOptions';
+import { statusLabel } from '../utils/resultPresentation';
 export function Badge({ value }: { value: string }) {
   const tone = [
     'allow',
@@ -16,7 +17,7 @@ export function Badge({ value }: { value: string }) {
     : ['block', 'blocked', 'failed', 'regression', 'rejected', 'error'].includes(value)
       ? 'bad'
       : 'neutral';
-  return <span className={`badge ${tone}`}>{value.toUpperCase().replaceAll('_', ' ')}</span>;
+  return <span className={`badge ${tone}`} data-status={value}>{statusLabel(value)}</span>;
 }
 export function ErrorNotice({ error }: { error: string | null | undefined }) {
   return error ? (
