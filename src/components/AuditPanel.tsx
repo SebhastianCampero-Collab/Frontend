@@ -7,6 +7,11 @@ import { useAuditPath } from '../hooks/useAuditPath';
 import { useAction } from '../hooks/useResource';
 import { RelativePathSchema, RepairSchema, auditLabel, record } from '../types/contracts';
 import type { Project, Repair } from '../types/contracts';
+import type { Check } from '../types/contracts';
+import { useProjectFiles } from '../hooks/useProjectFiles';
+import { FileSelector } from './FileSelector';
+import { FileReader } from './FileReader';
+import { TechnicalRequest } from './TechnicalRequest';
 import { CodeInspector } from './CodeInspector';
 import { TestRunnerView } from './TestRunnerView';
 import { GitControlView } from './GitControlView';
@@ -36,6 +41,8 @@ export function AuditPanel({
   const importedProject = project.repoPath.replaceAll('\\', '/').includes('/.devguardian-imports/');
   const audit = useAuditRunner(project.id, offset, view === 'results');
   const advanced = useAdvancedOptions();
+  const files = useProjectFiles(project.id, view !== 'results');
+  const [checks, setChecks] = useState<Check[]>(['syntax', 'semantic', 'lint']);
   const [selectedMode, setMode] = useState<'diagnose' | 'repair'>(initialMode);
   const mode = advanced ? selectedMode : 'diagnose';
   const previousFile = audit.history.data?.find((item) => auditLabel(item) === 'diagnosed' || item.audit.status === 'committed')?.audit.targetFile;
@@ -67,7 +74,11 @@ export function AuditPanel({
     const form = new FormData(event.currentTarget);
     try {
       RelativePathSchema.parse(path);
-      if (mode === 'diagnose') await audit.run({ projectId: project.id, mode, path });
+      if (mode === 'diagnose') {
+        if (!checks.length) throw new Error('Selecciona al menos una comprobación.');
+        if (!advanced && !files.data?.files.some((file) => file.path === path && file.analyzable)) throw new Error('Selecciona un archivo disponible en el listado del proyecto.');
+        await audit.run({ projectId: project.id, mode, path, checks });
+      }
       else {
         const repair = RepairSchema.parse({
           path,
@@ -128,7 +139,8 @@ export function AuditPanel({
             </button>}
           </div>
           <form onSubmit={(event) => void submit(event)} className="form-grid">
-            <label className="wide">
+            <FileSelector label={advanced ? 'Archivo del proyecto' : 'Archivo dentro del proyecto'} value={path} onChange={(value) => { setPath(value); setHash(''); }} files={files.data} loading={files.loading} error={files.error} refresh={files.refresh} disabled={audit.pending} sourceOnly />
+            {advanced && <label className="wide">
               Archivo dentro del proyecto
               <input
                 value={path}
@@ -140,7 +152,12 @@ export function AuditPanel({
                 required
                 disabled={audit.pending}
               />
-            </label>
+            </label>}
+            {mode === 'diagnose' && <fieldset className="wide review-checks"><legend>¿Qué quieres revisar?</legend>
+              {([['syntax', 'Errores de sintaxis'], ['semantic', 'Errores de tipos'], ['lint', 'Reglas de calidad']] as const).map(([check, label]) => <label key={check}><input type="checkbox" checked={checks.includes(check)} disabled={audit.pending} onChange={(event) => setChecks((current) => event.target.checked ? [...current, check] : current.filter((value) => value !== check))} />{label}</label>)}
+              {!checks.length && <p role="status">Selecciona al menos una comprobación para continuar.</p>}
+            </fieldset>}
+            {mode === 'diagnose' && <TechnicalRequest payload={{ projectId: project.id, mode, path, checks }} />}
             {mode === 'repair' && (
               <>
                 <p className="notice wide">
@@ -222,13 +239,13 @@ export function AuditPanel({
               <span>
                 Runner del proyecto: <strong>{project.runnerType}</strong>
               </span>
-              <button className="primary" disabled={audit.pending}>
+              <button className="primary" disabled={audit.pending || (mode === 'diagnose' && (!checks.length || (!advanced && (files.loading || Boolean(files.error) || !files.data?.files.some((file) => file.path === path && file.analyzable)))))}>
                 <Play size={15} />
                 {audit.pending
                   ? 'Auditoría en curso…'
                   : mode === 'repair'
                     ? 'Ejecutar reparación'
-                    : 'Ejecutar diagnóstico'}
+                    : 'Revisar código'}
               </button>
             </div>
           </form>
@@ -239,6 +256,7 @@ export function AuditPanel({
             </p>
           )}
         </section>}
+        {view !== 'results' && <FileReader projectId={project.id} files={files.data} loading={files.loading} error={files.error} refresh={files.refresh} />}
         {view !== 'review' && audit.details && (
           <>
             <GitControlView details={audit.details} />

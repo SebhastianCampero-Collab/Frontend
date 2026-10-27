@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { ProjectFilesSchema } from '../types/contracts';
 import { ImportEventSchema } from '../types/contracts';
 import type { ImportEvent } from '../types/contracts';
 import {
@@ -166,6 +167,7 @@ export class ApiClient {
     this.request(path, HealthSchema, undefined, signal, true);
   projects = (signal?: AbortSignal) =>
     this.request('/api/projects', z.array(ProjectSchema), undefined, signal);
+  projectFiles = (projectId: string, signal?: AbortSignal) => this.request(`/api/projects/${encodeURIComponent(projectId)}/files`, ProjectFilesSchema, undefined, signal);
   registerProject = (input: RegisterProject) =>
     this.request('/api/projects', ProjectSchema, RegisterProjectSchema.parse(input));
   prepareDemo = () => this.request('/api/demo/prepare', DemoSetupSchema, {});

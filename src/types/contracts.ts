@@ -10,6 +10,10 @@ export const ProjectSchema = z.object({
   createdAt: z.string(),
 });
 export type Project = z.infer<typeof ProjectSchema>;
+export const ProjectFilesSchema = z.object({ files: z.array(z.object({ path: z.string(), analyzable: z.boolean() })), truncated: z.boolean() });
+export type ProjectFiles = z.infer<typeof ProjectFilesSchema>;
+export const FileContextSchema = z.object({ path: z.string(), content: z.string(), startLine: z.number(), endLine: z.number(), fileHash: z.string(), truncated: z.boolean() });
+export type Check = 'syntax' | 'semantic' | 'lint';
 const ImportIssueSchema = z.object({ path: z.string(), code: z.string(), message: z.string() });
 export const ImportValidationSchema = z.object({
   compatible: z.boolean(), scope: z.literal('static-analysis'), entryFile: z.string().nullable(),
@@ -180,7 +184,7 @@ export type Repair = z.infer<typeof RepairSchema>;
 export const DemoSetupSchema = z.object({ project: ProjectSchema, repair: RepairSchema });
 export type DemoSetup = z.infer<typeof DemoSetupSchema>;
 export type AuditRequest =
-  | { projectId: string; mode: 'diagnose'; path: string }
+  | { projectId: string; mode: 'diagnose'; path: string; checks?: Check[] }
   | { projectId: string; mode: 'repair'; repair: Repair };
 export const HookEvaluationSchema = AuditDetailsSchema.extend({
   auditId: z.string(),

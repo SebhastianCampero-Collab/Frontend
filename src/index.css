@@ -1359,3 +1359,7 @@ td code {
 .page-intro { margin-bottom: 1.5rem; }
 .page-intro h1 { font-size: clamp(1.5rem, 3vw, 2.25rem); margin: 0.5rem 0; }
 .workspace-actions { display: flex; flex-wrap: wrap; gap: 0.75rem; }
+.review-checks { display: flex; flex-wrap: wrap; gap: 1rem; padding: 1rem; border: 1px solid var(--border, #294435); border-radius: 8px; }
+.review-checks label { display: flex; align-items: center; gap: 0.5rem; }
+.review-checks input { width: auto; }
+.technical-request, .file-content { overflow: auto; max-height: 28rem; padding: 1rem; white-space: pre-wrap; overflow-wrap: anywhere; }

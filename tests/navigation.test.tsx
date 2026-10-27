@@ -28,10 +28,11 @@ describe('simple workspace navigation', () => {
     open('/review'); render(<App />);
     await waitFor(() => expect(screen.getByLabelText('Archivo dentro del proyecto')).toHaveValue('src/bug.ts'));
     expect(screen.queryByRole('heading', { name: 'Historial' })).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Ejecutar diagnóstico' }));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Revisar código' })).toBeEnabled());
+    fireEvent.click(screen.getByRole('button', { name: 'Revisar código' }));
     await screen.findByRole('heading', { name: 'Resultado de la revisión' });
     expect(window.location.hash).toBe('#/results');
-    expect(run).toHaveBeenCalledWith({ projectId: project.id, mode: 'diagnose', path: 'src/bug.ts' });
+    expect(run).toHaveBeenCalledWith({ projectId: project.id, mode: 'diagnose', path: 'src/bug.ts', checks: ['syntax', 'semantic', 'lint'] });
     expect(screen.getByText('Type string is not assignable to number')).toBeInTheDocument();
     expect(screen.queryByText('Respuesta completa recuperable desde la BD')).not.toBeInTheDocument();
     expect(screen.queryByText('Commit SHA')).not.toBeInTheDocument();
@@ -58,8 +59,10 @@ describe('simple workspace navigation', () => {
   it('keeps path validation active when advanced mode is off', async () => {
     const run = vi.spyOn(api, 'runAudit');
     open('/review'); render(<App />);
-    fireEvent.change(await screen.findByLabelText('Archivo dentro del proyecto'), { target: { value: '../outside.ts' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Ejecutar diagnóstico' }));
-    await screen.findByRole('alert'); expect(run).not.toHaveBeenCalled();
+    const selector = await screen.findByLabelText('Archivo dentro del proyecto');
+    await waitFor(() => expect(selector).toBeEnabled());
+    fireEvent.change(selector, { target: { value: '../outside.ts' } });
+    expect(screen.getByRole('button', { name: 'Revisar código' })).toBeDisabled();
+    expect(run).not.toHaveBeenCalled();
   });
 });

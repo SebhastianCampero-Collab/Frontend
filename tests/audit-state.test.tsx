@@ -16,8 +16,8 @@ describe('audit file selection', () => {
     first.unmount();
     render(<AuditPanel project={imported} />);
     expect(screen.getByLabelText('Archivo dentro del proyecto')).toHaveValue('src/other.ts');
-    fireEvent.click(screen.getByRole('button', { name: 'Ejecutar diagnóstico' }));
-    await waitFor(() => expect(run).toHaveBeenCalledWith({ projectId: imported.id, mode: 'diagnose', path: 'src/other.ts' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Revisar código' }));
+    await waitFor(() => expect(run).toHaveBeenCalledWith({ projectId: imported.id, mode: 'diagnose', path: 'src/other.ts', checks: ['syntax', 'semantic', 'lint'] }));
   });
   it('keeps separate files when switching project props and returning', () => {
     const second = { ...imported, id: '33333333-3333-4333-8333-333333333333' };

@@ -45,7 +45,7 @@ describe('dashboard views', () => {
       },
     });
     render(<AuditPanel project={project} initialPath="src/bug.ts" />);
-    fireEvent.click(screen.getByRole('button', { name: 'Ejecutar diagnóstico' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Revisar código' }));
     await screen.findByText('Estado persistido');
     expect(
       screen.queryByText(/Diagnóstico sin autorización de reparación/),
@@ -93,12 +93,13 @@ describe('dashboard views', () => {
     vi.spyOn(api, 'audits').mockResolvedValue([details]);
     const run = vi.spyOn(api, 'runAudit').mockResolvedValue(diagnosed);
     render(<AuditPanel project={project} initialPath="src/bug.ts" />);
-    fireEvent.click(screen.getByRole('button', { name: 'Ejecutar diagnóstico' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Revisar código' }));
     await screen.findByText('Type string is not assignable to number');
     expect(run).toHaveBeenCalledWith({
       projectId: project.id,
       mode: 'diagnose',
       path: 'src/bug.ts',
+      checks: ['syntax', 'semantic', 'lint'],
     });
     expect(screen.getByText(/Diagnóstico sin autorización de reparación/)).toBeInTheDocument();
   });
