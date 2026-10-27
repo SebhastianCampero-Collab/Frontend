@@ -1,16 +1,19 @@
 import type { AuditDetails } from '../types/contracts';
 import { auditLabel, record } from '../types/contracts';
 import { Badge, JsonDetails } from './ui';
+import { useAdvancedOptions } from './AdvancedOptions';
 export function GitControlView({ details }: { details: AuditDetails }) {
+  const advanced = useAdvancedOptions();
   const result = record(details.audit.summaryJson['result']);
   const blocked = details.hookLogs.some((log) => log.decision === 'block');
   return (
     <section className="panel">
       <div className="section-heading">
-        <h2>Decisión y control Git</h2>
+        <h2>{advanced ? 'Decisión y control Git' : 'Resultado de la revisión'}</h2>
         <Badge value={blocked ? 'blocked' : auditLabel(details)} />
       </div>
-      <dl className="metadata">
+      {!advanced && <p>Archivo revisado: <strong>{details.audit.targetFile}</strong>. {auditLabel(details) === 'diagnosed' ? 'El análisis terminó. No se modificaron archivos ni se publicaron cambios.' : 'Consulta el diagnóstico y el historial para conocer el resultado de esta operación.'}</p>}
+      {advanced && <dl className="metadata">
         <div>
           <dt>Auditoría</dt>
           <dd>{details.audit.id}</dd>
@@ -27,8 +30,8 @@ export function GitControlView({ details }: { details: AuditDetails }) {
           <dt>Estado persistido</dt>
           <dd>{details.audit.status}</dd>
         </div>
-      </dl>
-      {details.audit.summaryJson['mode'] === 'diagnose' &&
+      </dl>}
+      {advanced && details.audit.summaryJson['mode'] === 'diagnose' &&
         details.audit.summaryJson['outcome'] === 'diagnosed' && (
           <p className="notice">
             Diagnóstico sin autorización de reparación: el estado persistido «blocked» no significa

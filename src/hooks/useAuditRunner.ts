@@ -4,7 +4,7 @@ import { auditLabel } from '../types/contracts';
 import type { AuditDetails, AuditRequest, AuditRun } from '../types/contracts';
 import { useAction, useResource } from './useResource';
 /** Polls persisted sessions; a POST response is never treated as proof of a commit by itself. */
-export function useAuditRunner(projectId: string, offset = 0) {
+export function useAuditRunner(projectId: string, offset = 0, restoreLatest = false) {
   const loader = useCallback(
     (signal: AbortSignal) => api.audits({ projectId, limit: 20, offset }, signal),
     [projectId, offset],
@@ -36,7 +36,7 @@ export function useAuditRunner(projectId: string, offset = 0) {
     }
   };
   const select = (id: string) => selection.execute(() => api.audit(id));
-  const details = selection.data ?? action.data;
+  const details = selection.data ?? action.data ?? (restoreLatest ? history.data?.[0] ?? null : null);
   return {
     history,
     run,

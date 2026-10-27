@@ -5,4 +5,5 @@ afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
   localStorage.clear();
+  window.history.replaceState(null, '', '/');
 });

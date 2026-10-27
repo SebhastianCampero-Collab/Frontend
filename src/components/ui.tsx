@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { useAdvancedOptions } from './AdvancedOptions';
 export function Badge({ value }: { value: string }) {
   const tone = [
     'allow',
@@ -34,6 +35,8 @@ export function JsonDetails({
   value: unknown;
   label?: string;
 }) {
+  const advanced = useAdvancedOptions();
+  if (!advanced) return null;
   return (
     <details className="json-details">
       <summary>{label}</summary>

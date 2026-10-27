@@ -1,5 +1,7 @@
 # DevGuardian · Dashboard de operaciones
 
+La navegación principal se divide en **Mis proyectos**, **Revisar código** y **Resultados e historial**. Las herramientas técnicas se agrupan bajo **Opciones avanzadas**. Ver [estructura del layout, rutas y garantías de seguridad](LAYOUT_Y_RUTAS.md).
+
 ## 🌐 Entorno de Producción Desplegado (Render)
 
 - **URL Pública del Frontend (Dashboard):** https://proyecto-certificacion-ai-frontend.onrender.com

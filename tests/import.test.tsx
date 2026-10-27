@@ -47,6 +47,8 @@ describe('GitHub project import', () => {
     expect(screen.getByText('Proyecto listo para análisis estático')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Cargar Demo Diagnóstico Real' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Cargar Demo Reparación / Subagentes' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Reparación verificada' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Opciones avanzadas' }));
     expect(screen.getByRole('button', { name: 'Reparación verificada' })).toBeDisabled();
   });
 });

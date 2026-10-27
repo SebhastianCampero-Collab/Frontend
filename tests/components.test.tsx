@@ -59,6 +59,7 @@ describe('dashboard views', () => {
     await screen.findByText('Backend conectado');
     expect(screen.getAllByText('Local JSON').length).toBeGreaterThan(0);
     expect(screen.getByLabelText('Proyecto activo')).toHaveValue(project.id);
+    fireEvent.click(screen.getByRole('button', { name: 'Opciones avanzadas' }));
     fireEvent.change(screen.getByLabelText('Bearer token'), {
       target: { value: 'test-session-token' },
     });

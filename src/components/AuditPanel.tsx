@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
 import { Play, GitBranch, FileCode2, History, Fingerprint } from 'lucide-react';
 import { api, message } from '../api/client';
@@ -10,6 +10,7 @@ import type { Project, Repair } from '../types/contracts';
 import { CodeInspector } from './CodeInspector';
 import { TestRunnerView } from './TestRunnerView';
 import { GitControlView } from './GitControlView';
+import { useAdvancedOptions } from './AdvancedOptions';
 import { Badge, Empty, ErrorNotice, Pagination } from './ui';
 
 export function AuditPanel({
@@ -18,17 +19,25 @@ export function AuditPanel({
   initialMode = 'diagnose',
   demoControls,
   initialPath,
+  view = 'all',
+  onComplete,
 }: {
   project: Project;
   initialRepair?: Repair;
   initialMode?: 'diagnose' | 'repair';
   demoControls?: ReactNode;
   initialPath?: string;
+  view?: 'review' | 'results' | 'all';
+  onComplete?: () => void;
 }) {
+  const mounted = useRef(true);
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
   const [offset, setOffset] = useState(0);
   const importedProject = project.repoPath.replaceAll('\\', '/').includes('/.devguardian-imports/');
-  const audit = useAuditRunner(project.id, offset);
-  const [mode, setMode] = useState<'diagnose' | 'repair'>(initialMode);
+  const audit = useAuditRunner(project.id, offset, view === 'results');
+  const advanced = useAdvancedOptions();
+  const [selectedMode, setMode] = useState<'diagnose' | 'repair'>(initialMode);
+  const mode = advanced ? selectedMode : 'diagnose';
   const previousFile = audit.history.data?.find((item) => auditLabel(item) === 'diagnosed' || item.audit.status === 'committed')?.audit.targetFile;
   const { path, setPath } = useAuditPath(project.id,
     initialRepair?.path ?? initialPath ?? previousFile ?? (project.name.startsWith('Demo Render ') ? 'src/target-bug.ts' : ''),
@@ -74,14 +83,15 @@ export function AuditPanel({
         });
         await audit.run({ projectId: project.id, mode, repair });
       }
+      if (mounted.current) onComplete?.();
     } catch (error: unknown) {
       setValidation(message(error));
     }
   };
   return (
-    <div className="audit-layout">
+    <div className="audit-layout" style={view === 'review' ? { gridTemplateColumns: 'minmax(0, 1fr)' } : undefined}>
       <div className="audit-main">
-        <section className="panel">
+        {view !== 'results' && <section className="panel">
           <div className="section-heading">
             <div>
               <span className="eyebrow">01 / EJECUCIÓN</span>
@@ -107,7 +117,7 @@ export function AuditPanel({
               <FileCode2 size={15} />
               Solo diagnóstico
             </button>
-            <button
+            {advanced && <button
               className={mode === 'repair' ? 'active' : ''}
               disabled={importedProject || audit.pending}
               title={importedProject ? 'La reparación con pruebas requiere un sandbox para proyectos importados.' : undefined}
@@ -115,7 +125,7 @@ export function AuditPanel({
             >
               <GitBranch size={15} />
               Reparación verificada
-            </button>
+            </button>}
           </div>
           <form onSubmit={(event) => void submit(event)} className="form-grid">
             <label className="wide">
@@ -228,16 +238,17 @@ export function AuditPanel({
               Si se interrumpe la conexión, consulta el historial antes de repetirla.
             </p>
           )}
-        </section>
-        {audit.details && (
+        </section>}
+        {view !== 'review' && audit.details && (
           <>
             <GitControlView details={audit.details} />
             <CodeInspector details={audit.details} />
-            <TestRunnerView details={audit.details} />
+            {(advanced || audit.details.testRuns.length > 0) ? <TestRunnerView details={audit.details} /> : <p className="notice">Esta revisión no ejecutó pruebas ni realizó reparaciones.</p>}
           </>
         )}
+        {view === 'results' && !audit.details && <Empty>{audit.history.error ? 'No se pudieron recuperar los resultados. Reintenta desde el historial.' : audit.history.loading ? 'Consultando resultados…' : 'Todavía no hay resultados. Ve a Revisar código para iniciar un diagnóstico.'}</Empty>}
       </div>
-      <aside className="panel history-panel">
+      {view !== 'review' && <aside className="panel history-panel">
         <div className="section-heading">
           <h2>
             <History size={17} />
@@ -276,7 +287,7 @@ export function AuditPanel({
           )
         )}
         <Pagination offset={offset} count={audit.history.data?.length ?? 0} onChange={setOffset} />
-      </aside>
+      </aside>}
     </div>
   );
 }
