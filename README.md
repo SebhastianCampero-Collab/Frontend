@@ -163,3 +163,16 @@ El bundle estático se genera en `dist/`. Configurar Node 24, `VITE_API_URL` con
 Las vistas se seleccionan dentro de la página raíz, por lo que no requieren reglas SPA para rutas adicionales. El Static Site está desplegado en Render y su integración Git espera los checks de CI antes del redespliegue. No guardar secretos Anthropic, DATABASE_URL ni bearer en variables `VITE_*`: se incorporan al JavaScript público.
 
 Referencias oficiales: [variables de Vite](https://vite.dev/guide/env-and-mode), [Vite en Vercel](https://vercel.com/docs/frameworks/frontend/vite), [sitios estáticos en Render](https://render.com/docs/static-sites).
+# Importación amigable desde GitHub
+
+En **Nuevo proyecto**, pega un enlace público `https://github.com/usuario/repositorio` y pulsa **Importar y preparar**. La aplicación recibe progreso real por SSE y muestra los archivos/configuraciones faltantes si el repositorio no es compatible. Cuando termina, selecciona el proyecto y abre Auditoría con un archivo fuente real. El registro por ruta del servidor permanece en **Opciones avanzadas**.
+
+Requiere un backend actualizado con `POST /api/projects/import`, accesible mediante el `VITE_API_URL` existente. Usa el mismo bearer en memoria que el resto de la API, sin incluirlo en la URL SSE. No se necesita otra librería, WebSocket ni variable de entorno.
+
+La importación habilita análisis estático JavaScript/TypeScript; no instala paquetes ni ejecuta scripts. La reparación y las pruebas de proyectos importados quedan bloqueadas hasta contar con un entorno aislado. Los checkouts en disco efímero de Render pueden desaparecer al redesplegar; la BD no conserva por sí sola los archivos.
+
+Verificación local: `npm run check`, `npm run build` y `npm test`. Las pruebas de importación están en `tests/import.test.tsx`.
+
+El formulario recuerda la ruta elegida por proyecto y backend en el almacenamiento local del navegador. Si no existe una selección guardada, puede recuperar el archivo de un diagnóstico exitoso del historial; no presupone que el repositorio contenga `src/server/contracts.ts`. Sin una ruta conocida, solicita elegir un archivo.
+
+El panel AST distingue diagnósticos completos, incompletos y resultados parciales. Solo muestra «0 hallazgos» cuando hay evidencia de un diagnóstico completado sin hallazgos. Un archivo inexistente muestra su ruta y pide corregirla. Estas regresiones se verifican en `tests/audit-state.test.tsx`.

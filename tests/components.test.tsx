@@ -64,7 +64,7 @@ describe('dashboard views', () => {
         summaryJson: { mode: 'diagnose', outcome: 'failed' },
       },
     });
-    render(<AuditPanel project={project} />);
+    render(<AuditPanel project={project} initialPath="src/bug.ts" />);
     fireEvent.click(screen.getByRole('button', { name: 'Ejecutar diagnóstico' }));
     await screen.findByText('Estado persistido');
     expect(
@@ -111,13 +111,13 @@ describe('dashboard views', () => {
   it('executes diagnosis, displays AST evidence and explains persisted blocked status', async () => {
     vi.spyOn(api, 'audits').mockResolvedValue([details]);
     const run = vi.spyOn(api, 'runAudit').mockResolvedValue(diagnosed);
-    render(<AuditPanel project={project} />);
+    render(<AuditPanel project={project} initialPath="src/bug.ts" />);
     fireEvent.click(screen.getByRole('button', { name: 'Ejecutar diagnóstico' }));
     await screen.findByText('Type string is not assignable to number');
     expect(run).toHaveBeenCalledWith({
       projectId: project.id,
       mode: 'diagnose',
-      path: 'src/server/contracts.ts',
+      path: 'src/bug.ts',
     });
     expect(screen.getByText(/Diagnóstico sin autorización de reparación/)).toBeInTheDocument();
   });
@@ -144,7 +144,7 @@ describe('dashboard views', () => {
       status: 'rolled_back',
       audit: { ...details.audit, status: 'rolled_back', summaryJson: {} },
     });
-    render(<AuditPanel project={project} />);
+    render(<AuditPanel project={project} initialPath="src/server/contracts.ts" />);
     fireEvent.click(screen.getByRole('button', { name: 'Reparación verificada' }));
     fireEvent.click(screen.getByRole('button', { name: 'Obtener hash actual' }));
     await waitFor(() =>
@@ -171,7 +171,7 @@ describe('dashboard views', () => {
   it('blocks malformed repair input locally before any audit mutation', async () => {
     vi.spyOn(api, 'audits').mockResolvedValue([]);
     const run = vi.spyOn(api, 'runAudit');
-    render(<AuditPanel project={project} />);
+    render(<AuditPanel project={project} initialPath="src/bug.ts" />);
     fireEvent.click(screen.getByRole('button', { name: 'Reparación verificada' }));
     fireEvent.change(screen.getByLabelText('SHA-256 esperado'), {
       target: { value: 'a'.repeat(64) },

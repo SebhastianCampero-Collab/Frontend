@@ -16,6 +16,7 @@ import { useServerHealth } from './hooks/useServerHealth';
 import { useProjects } from './hooks/useProjects';
 import { Header } from './components/Header';
 import { ProjectsPanel } from './components/ProjectsPanel';
+import { GitHubImport } from './components/GitHubImport';
 import { AuditPanel } from './components/AuditPanel';
 import { GuardrailsPanel } from './components/GuardrailsPanel';
 import { AgentMonitorView } from './components/AgentMonitorView';
@@ -23,7 +24,7 @@ import { McpPanel } from './components/McpPanel';
 import { Empty, ErrorNotice } from './components/ui';
 import { DemoPresets } from './components/DemoPresets';
 import { useAction } from './hooks/useResource';
-import type { DemoSetup } from './types/contracts';
+import type { DemoSetup, ImportReady } from './types/contracts';
 
 const tabs = [
   { id: 'audit', label: 'Auditoría', icon: LayoutDashboard, number: '01' },
@@ -46,15 +47,18 @@ export default function App() {
   const [selectedId, setSelectedId] = useState(rememberedProject);
   const [tab, setTab] = useState<Tab>('audit');
   const [registering, setRegistering] = useState(false);
+  const [imported, setImported] = useState<ImportReady | null>(null);
   const [revision, setRevision] = useState(0);
   const [token, setToken] = useState('');
   const [tokenSet, setTokenSet] = useState(false);
   const demo = useAction<DemoSetup>();
   const [demoMode, setDemoMode] = useState<'diagnose' | 'repair'>('diagnose');
   const visibleProjects = [...(projects.data ?? [])];
+  if (imported && !visibleProjects.some((item) => item.id === imported.project.id)) visibleProjects.push(imported.project);
   if (demo.data && !visibleProjects.some((item) => item.id === demo.data?.project.id))
     visibleProjects.push(demo.data.project);
   const project =
+    (imported?.project.id === selectedId ? imported.project : undefined) ??
     (demo.data?.project.id === selectedId ? demo.data.project : undefined) ??
     projects.data?.find((item) => item.id === selectedId) ??
     projects.data
@@ -241,7 +245,16 @@ export default function App() {
               </span>
             </div>
           )}
+          {(registering || (!project && !projects.loading)) && <GitHubImport onReady={(result) => {
+            setImported(result); selectProject(result.project.id); projects.refresh(); setTab('audit'); setRegistering(false);
+          }} />}
+          {imported && imported.project.id === project?.id && <section className="panel" role="status">
+            <h2>Proyecto listo para análisis estático</h2>
+            <p>Seleccionamos un archivo de tu repositorio. Puedes iniciar el diagnóstico desde Auditoría.</p>
+            <ul>{imported?.validation.warnings.map((issue) => <li key={issue.code}>{issue.message}</li>)}</ul>
+          </section>}
           {registering && (
+            <details><summary>Opciones avanzadas: registrar una carpeta del servidor</summary>
             <ProjectsPanel
               register={projects.register}
               pending={projects.registering}
@@ -251,12 +264,14 @@ export default function App() {
                 setRegistering(false);
               }}
             />
+            </details>
           )}
           <div key={`${project?.id ?? 'none'}-${tab}-${revision}`}>
             {project ? (
               tab === 'audit' ? (
                 <AuditPanel
                   project={project}
+                  {...(imported?.project.id === project.id && imported.validation.entryFile ? { initialPath: imported.validation.entryFile } : {})}
                   demoControls={demoControls}
                   {...(demo.data?.project.id === project.id
                     ? { initialRepair: demo.data.repair, initialMode: demoMode }

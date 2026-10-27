@@ -3,6 +3,7 @@ import type { FormEvent, ReactNode } from 'react';
 import { Play, GitBranch, FileCode2, History, Fingerprint } from 'lucide-react';
 import { api, message } from '../api/client';
 import { useAuditRunner } from '../hooks/useAuditRunner';
+import { useAuditPath } from '../hooks/useAuditPath';
 import { useAction } from '../hooks/useResource';
 import { RelativePathSchema, RepairSchema, auditLabel, record } from '../types/contracts';
 import type { Project, Repair } from '../types/contracts';
@@ -16,20 +17,23 @@ export function AuditPanel({
   initialRepair,
   initialMode = 'diagnose',
   demoControls,
+  initialPath,
 }: {
   project: Project;
   initialRepair?: Repair;
   initialMode?: 'diagnose' | 'repair';
   demoControls?: ReactNode;
+  initialPath?: string;
 }) {
   const [offset, setOffset] = useState(0);
+  const importedProject = project.repoPath.replaceAll('\\', '/').includes('/.devguardian-imports/');
   const audit = useAuditRunner(project.id, offset);
   const [mode, setMode] = useState<'diagnose' | 'repair'>(initialMode);
-  const [path, setPath] = useState(
-    initialRepair?.path ??
-      (project.name.startsWith('Demo Render ') ? 'src/target-bug.ts' : 'src/server/contracts.ts'),
+  const previousFile = audit.history.data?.find((item) => auditLabel(item) === 'diagnosed' || item.audit.status === 'committed')?.audit.targetFile;
+  const { path, setPath } = useAuditPath(project.id,
+    initialRepair?.path ?? initialPath ?? previousFile ?? (project.name.startsWith('Demo Render ') ? 'src/target-bug.ts' : ''),
   );
-  const [hash, setHash] = useState(initialRepair?.expectedFileHashes[initialRepair.path] ?? '');
+  const [hash, setHash] = useState(path === initialRepair?.path ? initialRepair.expectedFileHashes[path] ?? '' : '');
   const [validation, setValidation] = useState<string | null>(null);
   const context = useAction<{ path: string; fileHash: string }>();
   const hashValue = hash || (context.data?.path === path ? context.data.fileHash : '');
@@ -85,7 +89,8 @@ export function AuditPanel({
             </div>
             <Badge value={audit.phase} />
           </div>
-          {demoControls && (
+          {importedProject && <p>Analizarás un archivo de tu repositorio importado. El diagnóstico no modifica el código ni publica cambios en GitHub.</p>}
+          {!importedProject && demoControls && (
             <fieldset
               disabled={audit.pending || audit.selecting}
               style={{ border: 0, padding: 0, minWidth: 0 }}
@@ -104,8 +109,9 @@ export function AuditPanel({
             </button>
             <button
               className={mode === 'repair' ? 'active' : ''}
+              disabled={importedProject || audit.pending}
+              title={importedProject ? 'La reparación con pruebas requiere un sandbox para proyectos importados.' : undefined}
               onClick={() => setMode('repair')}
-              disabled={audit.pending}
             >
               <GitBranch size={15} />
               Reparación verificada
@@ -116,6 +122,7 @@ export function AuditPanel({
               Archivo dentro del proyecto
               <input
                 value={path}
+                placeholder="Ejemplo: src/calculator.ts"
                 onChange={(event) => {
                   setPath(event.target.value);
                   setHash('');

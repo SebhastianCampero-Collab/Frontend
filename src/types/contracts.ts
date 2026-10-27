@@ -10,6 +10,20 @@ export const ProjectSchema = z.object({
   createdAt: z.string(),
 });
 export type Project = z.infer<typeof ProjectSchema>;
+const ImportIssueSchema = z.object({ path: z.string(), code: z.string(), message: z.string() });
+export const ImportValidationSchema = z.object({
+  compatible: z.boolean(), scope: z.literal('static-analysis'), entryFile: z.string().nullable(),
+  missing: z.array(ImportIssueSchema), warnings: z.array(ImportIssueSchema),
+});
+export const ImportReadySchema = z.object({ project: ProjectSchema, validation: ImportValidationSchema });
+export type ImportReady = z.infer<typeof ImportReadySchema>;
+export const ImportEventSchema = z.discriminatedUnion('event', [
+  z.object({ event: z.literal('progress'), data: z.object({ phase: z.string(), message: z.string() }) }),
+  z.object({ event: z.literal('ready'), data: ImportReadySchema }),
+  z.object({ event: z.literal('incompatible'), data: ImportValidationSchema }),
+  z.object({ event: z.literal('failed'), data: z.object({ message: z.string() }) }),
+]);
+export type ImportEvent = z.infer<typeof ImportEventSchema>;
 export const RegisterProjectSchema = ProjectSchema.omit({ id: true, createdAt: true });
 export type RegisterProject = z.infer<typeof RegisterProjectSchema>;
 export const HealthSchema = z.object({

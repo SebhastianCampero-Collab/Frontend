@@ -1,4 +1,6 @@
 import { z } from 'zod';
+import { ImportEventSchema } from '../types/contracts';
+import type { ImportEvent } from '../types/contracts';
 import {
   AuditDetailsSchema,
   DemoSetupSchema,
@@ -43,6 +45,45 @@ export class ApiClient {
   constructor(public readonly baseUrl = API_URL) {}
   setToken(value: string): void {
     this.token = value.trim();
+  }
+  async importProject(url: string, onEvent: (event: ImportEvent) => void, signal: AbortSignal): Promise<void> {
+    const headers = new Headers({ 'Content-Type': 'application/json', Accept: 'text/event-stream' });
+    if (this.token) headers.set('Authorization', `Bearer ${this.token}`);
+    const response = await fetch(`${this.baseUrl}/api/projects/import`, {
+      method: 'POST', headers, body: JSON.stringify({ url }),
+      signal: AbortSignal.any([signal, AbortSignal.timeout(240000)]),
+    });
+    if (!response.ok) {
+      const payload: unknown = await response.json();
+      const error = record(record(payload)['error']);
+      throw new ApiError(typeof error['message'] === 'string' ? error['message'] : 'No se pudo iniciar la importación.', response.status);
+    }
+    if (!response.body || !response.headers.get('Content-Type')?.includes('text/event-stream'))
+      throw new ApiError('El servidor no devolvió un flujo de progreso válido.');
+    const reader = response.body.getReader(), decoder = new TextDecoder();
+    let buffer = '', terminal = false;
+    try {
+      while (!terminal) {
+        const { value, done } = await reader.read();
+        buffer += decoder.decode(value, { stream: !done });
+        buffer = buffer.replace(/\r\n/g, '\n');
+        if (buffer.length > 131072) throw new ApiError('Respuesta de importación demasiado grande.');
+        let boundary: number;
+        while ((boundary = buffer.indexOf('\n\n')) >= 0) {
+          const frame = buffer.slice(0, boundary); buffer = buffer.slice(boundary + 2);
+          const lines = frame.split('\n');
+          const event = lines.find((line) => line.startsWith('event:'))?.slice(6).trim();
+          if (!event) continue;
+          const data = lines.filter((line) => line.startsWith('data:')).map((line) => line.slice(5).trimStart()).join('\n');
+          const parsed = ImportEventSchema.parse({ event, data: JSON.parse(data) as unknown });
+          onEvent(parsed);
+          terminal = parsed.event !== 'progress';
+          if (terminal) break;
+        }
+        if (done) break;
+      }
+      if (!terminal) throw new ApiError('La conexión se interrumpió antes de confirmar el resultado. Revisa la lista de proyectos antes de reintentar.');
+    } finally { await reader.cancel().catch(() => undefined); reader.releaseLock(); }
   }
   private async exchange(
     path: string,
