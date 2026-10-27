@@ -176,13 +176,15 @@ describe('dashboard views', () => {
       decision: 'block',
     });
     render(<GuardrailsPanel projectId={project.id} />);
-    fireEvent.click(screen.getByRole('button', { name: 'Probar BLOCK · .env' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Archivo protegido' }));
+    expect(evaluate).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'Comprobar seguridad' }));
     await waitFor(() =>
       expect(evaluate).toHaveBeenCalledWith(project.id, ['.env'], '+DEMO_VALUE=blocked'),
     );
     const status = await screen.findByRole('status');
-    expect(within(status).getByText('BLOCK')).toBeInTheDocument();
-    expect(within(status).getByText(log.reason)).toBeInTheDocument();
+    expect(within(status).getByText('Bloqueado')).toBeInTheDocument();
+    expect(within(status).getByText('Bloqueado porque .env es un archivo protegido. No se modificó ningún archivo.')).toBeInTheDocument();
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
   it.each(['diagnostic', 'verification', 'patch-safety'] as const)(

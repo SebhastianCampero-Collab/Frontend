@@ -27,7 +27,7 @@ Los secretos se configuran en Environment de Render. Las copias locales `.env` e
 
 El resultado DIAGNOSED conserva outcome=diagnosed y traza completed; la sesión DB mantiene status=blocked por el contrato histórico, pues diagnosticar no autoriza un commit. No es un error.
 
-En **Hooks & Guardrails**, ejecutar **Probar ALLOW** y **Probar BLOCK · .env**. Son preflights reales: guardan evidencia y no modifican archivos. Recargar para comprobar persistencia. No se borran registros fallidos anteriores.
+En **Hooks y guardrails**, los botones **Permitido**, **Archivo protegido** y **Secreto ficticio** solo cargan texto en el formulario, sin enviar peticiones. Después de revisar los campos, pulsar **Comprobar seguridad** para solicitar el preflight al backend. El resultado explica el permiso o bloqueo y se guarda en el historial sin modificar archivos. Cambiar de ejemplo o editar los datos descarta el resultado anterior; no borra registros persistidos.
 
 El dashboard ya no ofrece botones de carga de demos ni selecciona proyectos de ejemplo automáticamente. Los registros generados con el prefijo reservado `Demo Render ` o ubicados bajo `.devguardian-demo/` quedan ocultos del selector y del contador principal. Se conservan en la BD junto con su historial, sin eliminarlos. El endpoint técnico `/api/demo/prepare` del backend no se modifica ni se invoca desde el dashboard.
 

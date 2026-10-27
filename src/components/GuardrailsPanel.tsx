@@ -3,6 +3,7 @@ import type { FormEvent } from 'react';
 import { ShieldCheck, ShieldX } from 'lucide-react';
 import { useHookGuardrails } from '../hooks/useHookGuardrails';
 import { Badge, Empty, ErrorNotice, JsonDetails, Pagination } from './ui';
+import { guardrailExplanation } from '../utils/guardrailPresentation';
 export function GuardrailsPanel({ projectId }: { projectId: string }) {
   const [offset, setOffset] = useState(0);
   const [auditId, setAuditId] = useState('');
@@ -11,11 +12,18 @@ export function GuardrailsPanel({ projectId }: { projectId: string }) {
   const hooks = useHookGuardrails(projectId, auditId, offset);
   const [file, setFile] = useState('src/guardrail.ts');
   const [diff, setDiff] = useState('+export const verified = true;');
+  const [loaded, setLoaded] = useState(false);
+  const loadExample = (path: string, content: string) => {
+    setFile(path); setDiff(content); setLoaded(true); hooks.evaluation.reset();
+  };
+  const edit = () => { setLoaded(false); hooks.evaluation.reset(); };
   const evaluate = (files: string[], patch: string) => {
     void hooks.evaluateGuardrail(files, patch).catch(() => {});
   };
   const submit = (event: FormEvent) => {
     event.preventDefault();
+    if (hooks.evaluation.pending) return;
+    setLoaded(false);
     evaluate(
       file
         .split(',')
@@ -34,10 +42,10 @@ export function GuardrailsPanel({ projectId }: { projectId: string }) {
             <span className="eyebrow">02 / POLÍTICAS ACTIVAS</span>
             <h2>Hooks & Guardrails</h2>
           </div>
-          <Badge value={hooks.data?.config.enabled ? 'allow' : 'unknown'} />
+          <span className={`badge ${hooks.data?.config.enabled ? 'good' : 'neutral'}`}>{hooks.data ? hooks.data.config.enabled ? 'Hooks habilitados' : 'Hooks deshabilitados' : 'Consultando reglas'}</span>
         </div>
         <p>
-          Evaluaciones reales del backend. El simulador comprueba el parche sin modificar archivos.
+          Prepara los datos y pulsa Comprobar seguridad para consultar las reglas del backend. Esta comprobación no aplica parches ni modifica archivos; registra la decisión en el historial.
         </p>
         <ErrorNotice error={hooks.error} />
         {hooks.data && (
@@ -57,63 +65,69 @@ export function GuardrailsPanel({ projectId }: { projectId: string }) {
       </section>
       <section className="panel">
         <div className="section-heading">
-          <h2>Evaluar un guardrail en vivo</h2>
+          <h2>Comprobar la seguridad de un cambio</h2>
           <span className="eyebrow">PREFLIGHT / SIN MUTACIÓN</span>
         </div>
         <div className="demo-buttons">
           <button
+            type="button"
             className="ghost"
             disabled={hooks.evaluation.pending}
-            onClick={() => evaluate(['src/guardrail.ts'], '+export const verified = true;')}
+            onClick={() => loadExample('src/guardrail.ts', '+export const verified = true;')}
           >
-            Probar ALLOW
+            Permitido
           </button>
           <button
+            type="button"
             className="danger-button"
             disabled={hooks.evaluation.pending}
-            onClick={() => evaluate(['.env'], '+DEMO_VALUE=blocked')}
+            onClick={() => loadExample('.env', '+DEMO_VALUE=blocked')}
           >
-            Probar BLOCK · .env
+            Archivo protegido
           </button>
           <button
+            type="button"
             className="ghost"
             disabled={hooks.evaluation.pending}
-            onClick={() => evaluate(['src/guardrail.ts'], '+SECRET_KEY=demonstration')}
+            onClick={() => loadExample('src/guardrail.ts', '+SECRET_KEY=demonstration')}
           >
-            Probar bloqueo de secreto
+            Secreto ficticio
           </button>
         </div>
+        <p>Los ejemplos solo rellenan el formulario. El resultado se obtiene al comprobarlo.</p>
+        {loaded && <p role="status" className="notice">Archivo y contenido cargados. Revisa los datos y pulsa Comprobar seguridad para enviarlos.</p>}
         <form className="form-grid" onSubmit={submit}>
           <label>
             Archivos (separados por coma)
-            <input value={file} onChange={(event) => setFile(event.target.value)} required />
+            <input value={file} onChange={(event) => { setFile(event.target.value); edit(); }} required disabled={hooks.evaluation.pending} />
           </label>
           <label className="wide">
             Contenido del parche
             <textarea
               rows={3}
               value={diff}
-              onChange={(event) => setDiff(event.target.value)}
+              onChange={(event) => { setDiff(event.target.value); edit(); }}
+              disabled={hooks.evaluation.pending}
               required
               spellCheck={false}
             />
           </label>
-          <button className="primary" disabled={hooks.evaluation.pending}>
-            {hooks.evaluation.pending ? 'Evaluando…' : 'Evaluar escenario'}
+          <button type="submit" className="primary" disabled={hooks.evaluation.pending}>
+            {hooks.evaluation.pending ? 'Comprobando…' : 'Comprobar seguridad'}
           </button>
         </form>
         <ErrorNotice error={hooks.evaluation.error} />
         {hooks.evaluation.data && (
           <div className="evaluation-result" role="status">
-            <Badge value={hooks.evaluation.data.decision} />
+            <span className={`badge ${hooks.evaluation.data.decision === 'block' ? 'bad' : 'good'}`}>{hooks.evaluation.data.decision === 'block' ? 'Bloqueado' : 'Permitido'}</span>
             <span>
               Auditoría: <code>{hooks.evaluation.data.auditId}</code>
             </span>
             <p>
-              {hooks.evaluation.data.hookLogs
+              {guardrailExplanation(hooks.evaluation.data.decision, hooks.evaluation.data.hookLogs
                 .filter((log) => log.decision === hooks.evaluation.data?.decision)
                 .map((log) => log.reason)
-                .join(' · ')}
+                )}
             </p>
             <JsonDetails value={hooks.evaluation.data} />
           </div>
