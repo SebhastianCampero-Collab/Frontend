@@ -100,7 +100,7 @@ describe('HTTP and MCP contracts', () => {
     );
     await expect(client.projects()).rejects.toMatchObject({
       status: 401,
-      message: 'Authentication required.',
+      message: 'No tienes acceso a esta operación. Revisa el token en Opciones avanzadas y vuelve a intentarlo.',
     });
   });
   it('encodes audit filters and pagination', async () => {

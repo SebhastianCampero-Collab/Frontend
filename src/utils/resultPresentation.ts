@@ -1,5 +1,6 @@
 import type { AuditDetails, TestRun } from '../types/contracts';
 import { auditLabel, record } from '../types/contracts';
+import { explainError } from './errors';
 
 const labels: Record<string, string> = {
   diagnosed: 'Análisis terminado', committed: 'Corrección verificada y guardada',
@@ -44,7 +45,7 @@ export function resultPresentation(details: AuditDetails) {
   else if (state === 'recovery_required') text = 'El backend solicita revisión manual del intento. No asumas que el commit, la auditoría o la reversión quedaron completamente sincronizados.';
   else text = 'Consulta el estado y la evidencia de esta operación. Todavía no se confirma una corrección verificada.';
   return { state, displayState: state === 'committed' && !verified ? 'inconclusive' : state, text,
-    reason: state === 'diagnosed' ? null : typeof reason === 'string' ? reason : null,
+    reason: state === 'diagnosed' ? null : typeof reason === 'string' ? explainError(reason) : null,
     checksText: state === 'diagnosed' ? checks.length ? `Comprobaciones ejecutadas: ${checks.map((check) => checkNames[check]).join(', ')}.${!checks.includes('semantic') ? ' No se revisaron errores de tipos.' : ''} El análisis estático no descarta todos los fallos de lógica.`
       : 'No se guardó la selección de comprobaciones en esta auditoría; no se afirma una revisión completa de todos los aspectos.' : null,
     baseline, candidate };

@@ -8,42 +8,61 @@ export function useResource<T>(
   intervalMs = 0,
   enabled = true,
 ) {
-  const [revision, setRevision] = useState(0);
+  const reload = useRef<() => Promise<void>>(() => Promise.resolve());
   const [state, setState] = useState<{
     key: string;
     data: T | null;
     error: string | null;
     loading: boolean;
-  }>({ key, data: null, error: null, loading: enabled });
+    refreshStatus: 'idle' | 'updating' | 'updated' | 'unchanged' | 'error';
+    updatedAt: number | null;
+  }>({ key, data: null, error: null, loading: enabled, refreshStatus: 'idle', updatedAt: null });
   useEffect(() => {
     if (!enabled) return;
     let disposed = false;
+    let pending: Promise<void> = Promise.resolve();
     let busy = false;
+    let manual = false;
+    let previous: string | undefined;
     const controller = new AbortController();
-    const load = async () => {
-      if (busy) return;
+    const load = (requested = false): Promise<void> => {
+      if (disposed) return Promise.resolve();
+      if (requested) {
+        manual = true;
+        setState((current) => ({ ...current, refreshStatus: 'updating' }));
+      }
+      if (busy) return pending;
       busy = true;
       setState((previous) => ({
+        ...previous,
         key,
         data: previous.key === key ? previous.data : null,
         error: null,
         loading: true,
+        refreshStatus: previous.key === key ? previous.refreshStatus : 'idle',
+        updatedAt: previous.key === key ? previous.updatedAt : null,
       }));
-      try {
-        const data = await loader(controller.signal);
-        if (!disposed) setState({ key, data, error: null, loading: false });
-      } catch (error: unknown) {
-        if (!disposed)
-          setState((previous) => ({
-            key,
-            data: previous.key === key ? previous.data : null,
-            error: message(error),
-            loading: false,
-          }));
-      } finally {
-        busy = false;
-      }
+      pending = (async () => {
+        try {
+          const data = await loader(controller.signal);
+          const serialized = JSON.stringify(data);
+          const unchanged = previous !== undefined && previous === serialized;
+          previous = serialized;
+          const wasManual = manual;
+          if (!disposed) setState((current) => ({ ...current, key, data, error: null, loading: false,
+            refreshStatus: wasManual ? unchanged ? 'unchanged' : 'updated' : current.refreshStatus,
+            updatedAt: wasManual ? Date.now() : current.updatedAt }));
+        } catch (error: unknown) {
+          const wasManual = manual;
+          if (!disposed) setState((current) => ({ ...current, key,
+            data: current.key === key ? current.data : null, error: message(error), loading: false,
+            refreshStatus: wasManual ? 'error' : current.refreshStatus }));
+        } finally { busy = false; manual = false; }
+      })();
+      return pending;
     };
+    const refresh = () => load(true);
+    reload.current = refresh;
     void load();
     const timer = intervalMs
       ? setInterval(() => {
@@ -53,13 +72,16 @@ export function useResource<T>(
     return () => {
       disposed = true;
       controller.abort();
+      if (reload.current === refresh) reload.current = () => Promise.resolve();
       if (timer) clearInterval(timer);
     };
-  }, [loader, key, intervalMs, enabled, revision]);
-  const refresh = useCallback(() => setRevision((value) => value + 1), []);
+  }, [loader, key, intervalMs, enabled]);
+  const refresh = useCallback(() => { void reload.current(); }, []);
+  const reloadNow = useCallback(() => reload.current(), []);
   return {
-    ...(enabled && state.key === key ? state : { key, data: null, error: null, loading: enabled }),
+    ...(enabled && state.key === key ? state : { key, data: null, error: null, loading: enabled, refreshStatus: 'idle' as const, updatedAt: null }),
     refresh,
+    reload: reloadNow,
   };
 }
 

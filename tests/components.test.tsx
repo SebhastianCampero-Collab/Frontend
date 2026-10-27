@@ -122,12 +122,12 @@ describe('dashboard views', () => {
       data: { path: 'src/server/contracts.ts', fileHash: 'a'.repeat(64) },
       meta: {},
     });
-    const run = vi.spyOn(api, 'runAudit').mockResolvedValue({
+    const run = vi.spyOn(api, 'runAudit').mockImplementation(async (input) => ({
       ...diagnosed,
       mode: 'repair',
       status: 'rolled_back',
-      audit: { ...details.audit, status: 'rolled_back', summaryJson: {} },
-    });
+      audit: { ...details.audit, id: input.mode === 'repair' ? input.repair.parentSessionId ?? details.audit.id : details.audit.id, status: 'rolled_back', summaryJson: {} },
+    }));
     render(<AuditPanel project={project} initialPath="src/server/contracts.ts" />);
     fireEvent.click(screen.getByRole('button', { name: 'Reparación verificada' }));
     fireEvent.click(screen.getByRole('button', { name: 'Obtener hash actual' }));

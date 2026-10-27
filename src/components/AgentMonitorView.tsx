@@ -3,6 +3,7 @@ import { ArrowDown, Workflow } from 'lucide-react';
 import { useSubagents } from '../hooks/useSubagents';
 import { record } from '../types/contracts';
 import { Badge, Empty, ErrorNotice, JsonDetails, Pagination } from './ui';
+import { RefreshButton } from './RefreshButton';
 export function AgentMonitorView({ projectId }: { projectId: string }) {
   const [offset, setOffset] = useState(0);
   const [auditId, setAuditId] = useState('');
@@ -15,9 +16,7 @@ export function AgentMonitorView({ projectId }: { projectId: string }) {
           <span className="eyebrow">03 / DELEGACIÓN DETERMINISTA</span>
           <h2>Subagentes y consumo de resultados</h2>
         </div>
-        <button className="text-button" onClick={agents.refresh}>
-          Recargar trazas
-        </button>
+        <RefreshButton resource={agents} label="Recargar trazas" />
       </div>
       <p>
         Contexto delegado → worker → herramientas → dictamen → resultado consumido. Las trazas
@@ -34,12 +33,13 @@ export function AgentMonitorView({ projectId }: { projectId: string }) {
         <label>
           UUID de auditoría
           <input
+            disabled={agents.loading}
             value={input}
             onChange={(event) => setInput(event.target.value)}
             placeholder="Vacío para todas las auditorías del proyecto"
           />
         </label>
-        <button className="ghost">Filtrar delegaciones</button>
+        <button className="ghost" disabled={agents.loading}>Filtrar delegaciones</button>
       </form>
       <ErrorNotice error={agents.error} />
       {agents.data?.length ? (
@@ -112,7 +112,7 @@ export function AgentMonitorView({ projectId }: { projectId: string }) {
             : 'No hay delegaciones registradas. Ejecuta un diagnóstico o una reparación para generar trazas reales.'}
         </Empty>
       )}
-      <Pagination offset={offset} count={agents.data?.length ?? 0} onChange={setOffset} />
+      <Pagination offset={offset} count={agents.data?.length ?? 0} onChange={setOffset} disabled={agents.loading} />
     </section>
   );
 }

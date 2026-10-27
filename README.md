@@ -1,5 +1,7 @@
 # DevGuardian · Dashboard de operaciones
 
+Las recargas muestran su estado y las reparaciones se siguen mediante evidencia del backend, sin progreso simulado. Ver [feedback asíncrono y recuperación](FEEDBACK_ASINCRONO.md).
+
 Los resultados comienzan con una explicación en lenguaje claro y accesos a pruebas, cambios y detalles técnicos. Ver [Resultados comprensibles](RESULTADOS_COMPRENSIBLES.md).
 
 La selección de archivos reales, los checks de revisión y la consulta por líneas se explican en [Formularios de archivos](FORMULARIOS_ARCHIVOS.md). Los formularios generan el JSON internamente y solo lo muestran al activar las opciones avanzadas.

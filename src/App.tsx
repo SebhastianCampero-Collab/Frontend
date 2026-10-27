@@ -55,6 +55,7 @@ export default function App() {
   const [registering, setRegistering] = useState(false);
   const [imported, setImported] = useState<ImportReady | null>(null);
   const [revision, setRevision] = useState(0);
+  const [auditBusy, setAuditBusy] = useState(false);
   const [token, setToken] = useState('');
   const [tokenSet, setTokenSet] = useState(false);
   const visibleProjects = (projects.data ?? []).filter((item) =>
@@ -99,6 +100,8 @@ export default function App() {
             <a
               key={item.id}
               href={`#${routes[item.id]}`}
+              aria-disabled={auditBusy}
+              onClick={(event) => { if (auditBusy) event.preventDefault(); }}
               className={route === item.id ? 'nav-item active' : 'nav-item'}
               aria-current={route === item.id ? 'page' : undefined}
             >
@@ -109,12 +112,12 @@ export default function App() {
           ))}
         </nav>
         <div className="advanced-navigation">
-          <button className="ghost" aria-expanded={advanced} aria-controls="advanced-navigation" onClick={() => {
+          <button className="ghost" disabled={auditBusy} aria-expanded={advanced} aria-controls="advanced-navigation" onClick={() => {
             setShowAdvanced(!advanced);
             if (advancedRoute) navigate('projects');
           }}>Opciones avanzadas</button>
           {advanced && <nav id="advanced-navigation" aria-label="Herramientas avanzadas">
-            {advancedTabs.map((item) => <a key={item.id} className={route === item.id ? 'nav-item active' : 'nav-item'} href={`#${routes[item.id]}`} aria-current={route === item.id ? 'page' : undefined}>
+            {advancedTabs.map((item) => <a key={item.id} className={route === item.id ? 'nav-item active' : 'nav-item'} href={`#${routes[item.id]}`} aria-disabled={auditBusy} onClick={(event) => { if (auditBusy) event.preventDefault(); }} aria-current={route === item.id ? 'page' : undefined}>
               <item.icon size={18} /><span>{item.label}</span>
             </a>)}
             <p>Incluye MCP, JSON, hashes y trazas. Los controles de seguridad permanecen activos en todos los modos.</p>
@@ -139,7 +142,7 @@ export default function App() {
         <Header
           health={health.data}
           connected={health.connected}
-          refreshing={health.loading || projects.loading}
+          refreshing={auditBusy || health.loading || projects.loading}
           onRefresh={refresh}
         />
         <main id="main-content" tabIndex={-1}>
@@ -222,7 +225,7 @@ export default function App() {
                   aria-label="Proyecto activo"
                   value={project?.id ?? ''}
                   onChange={(event) => selectProject(event.target.value)}
-                  disabled={!visibleProjects.length}
+                  disabled={auditBusy || !visibleProjects.length}
                 >
                   {!visibleProjects.length && <option value="">Sin proyectos registrados</option>}
                   {visibleProjects.map((item) => (
@@ -235,6 +238,7 @@ export default function App() {
             </div>
             <button
               className="ghost"
+              disabled={auditBusy}
               onClick={() => { navigate('projects'); setRegistering((value) => route === 'projects' ? !value : true); }}
               aria-expanded={registering}
             >
@@ -282,6 +286,7 @@ export default function App() {
                   project={project}
                   view={route === 'review' ? 'review' : 'results'}
                   onComplete={() => navigate('results')}
+                  onBusyChange={setAuditBusy}
                   {...(imported?.project.id === project.id && imported.validation.entryFile ? { initialPath: imported.validation.entryFile } : {})}
                 />
               ) : route === 'hooks' ? (

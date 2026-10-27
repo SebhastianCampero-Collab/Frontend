@@ -12,6 +12,8 @@ import { useProjectFiles } from '../hooks/useProjectFiles';
 import { FileSelector } from './FileSelector';
 import { FileReader } from './FileReader';
 import { TechnicalRequest } from './TechnicalRequest';
+import { RepairProgress } from './RepairProgress';
+import { RefreshButton } from './RefreshButton';
 import { CodeInspector } from './CodeInspector';
 import { ResultResponse } from './ResultResponse';
 import { useAdvancedOptions } from './AdvancedOptions';
@@ -25,6 +27,7 @@ export function AuditPanel({
   initialPath,
   view = 'all',
   onComplete,
+  onBusyChange,
 }: {
   project: Project;
   initialRepair?: Repair;
@@ -33,12 +36,14 @@ export function AuditPanel({
   initialPath?: string;
   view?: 'review' | 'results' | 'all';
   onComplete?: () => void;
+  onBusyChange?: (busy: boolean) => void;
 }) {
   const mounted = useRef(true);
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
   const [offset, setOffset] = useState(0);
   const importedProject = project.repoPath.replaceAll('\\', '/').includes('/.devguardian-imports/');
   const audit = useAuditRunner(project.id, offset, view === 'results');
+  useEffect(() => { onBusyChange?.(audit.pending); return () => onBusyChange?.(false); }, [audit.pending, onBusyChange]);
   const advanced = useAdvancedOptions();
   const files = useProjectFiles(project.id, view !== 'results');
   const [checks, setChecks] = useState<Check[]>(['syntax', 'semantic', 'lint']);
@@ -137,7 +142,7 @@ export function AuditPanel({
               Reparación verificada
             </button>}
           </div>
-          <form onSubmit={(event) => void submit(event)} className="form-grid">
+          <form onSubmit={(event) => void submit(event)}><fieldset className="form-grid action-fields" disabled={audit.pending || audit.selecting}>
             <FileSelector label={advanced ? 'Archivo del proyecto' : 'Archivo dentro del proyecto'} value={path} onChange={(value) => { setPath(value); setHash(''); }} files={files.data} loading={files.loading} error={files.error} refresh={files.refresh} disabled={audit.pending} sourceOnly />
             {advanced && <label className="wide">
               Archivo dentro del proyecto
@@ -247,15 +252,16 @@ export function AuditPanel({
                     : 'Revisar código'}
               </button>
             </div>
-          </form>
+          </fieldset></form>
+          {audit.pending && (mode === 'repair' || audit.repairActive) && <RepairProgress details={audit.progress} error={audit.progressError} recovering={audit.awaitingConfirmation} resource={audit.progressResource} />}
           {audit.pending && (
             <p role="status" className="notice">
-              El backend está ejecutando la operación. El historial consulta la BD cada 5 segundos.
-              Si se interrumpe la conexión, consulta el historial antes de repetirla.
+              La solicitud está pendiente de confirmación. El historial consulta los registros del backend.
+              Si se interrumpe la conexión, comprueba el estado antes de repetir la operación.
             </p>
           )}
         </section>}
-        {view !== 'results' && <FileReader projectId={project.id} files={files.data} loading={files.loading} error={files.error} refresh={files.refresh} />}
+        {view !== 'results' && <FileReader projectId={project.id} files={files.data} loading={files.loading} error={files.error} refresh={files.refresh} disabled={audit.pending} />}
         {view !== 'review' && audit.details && (
           <>
             <ResultResponse key={audit.details.audit.id} details={audit.details} />
@@ -270,9 +276,7 @@ export function AuditPanel({
             <History size={17} />
             Historial
           </h2>
-          <button className="text-button" onClick={audit.history.refresh}>
-            Recargar BD
-          </button>
+          <RefreshButton resource={audit.history} label="Recargar BD" disabled={audit.pending || audit.selecting} />
         </div>
         <p>Sesiones persistidas · se recuperan al recargar.</p>
         <ErrorNotice error={audit.history.error} />
@@ -302,7 +306,7 @@ export function AuditPanel({
             <Empty>Aún no hay auditorías de este proyecto. Ejecuta el primer diagnóstico.</Empty>
           )
         )}
-        <Pagination offset={offset} count={audit.history.data?.length ?? 0} onChange={setOffset} />
+        <Pagination offset={offset} count={audit.history.data?.length ?? 0} onChange={setOffset} disabled={audit.history.loading || audit.pending || audit.selecting} />
       </aside>}
     </div>
   );

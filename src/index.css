@@ -1369,3 +1369,4 @@ td code {
 .result-summary { font-size: 1.08rem; line-height: 1.7; }
 .result-evidence { margin-top: 1.25rem; padding-top: 1rem; border-top: 1px solid var(--border, #294435); }
 .result-response .badge, .history-list .badge { white-space: normal; line-height: 1.5; max-width: 100%; }
+.action-fields { border: 0; padding: 0; margin: 0; min-width: 0; }

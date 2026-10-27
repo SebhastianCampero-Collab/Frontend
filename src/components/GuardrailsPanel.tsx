@@ -4,6 +4,7 @@ import { ShieldCheck, ShieldX } from 'lucide-react';
 import { useHookGuardrails } from '../hooks/useHookGuardrails';
 import { Badge, Empty, ErrorNotice, JsonDetails, Pagination } from './ui';
 import { guardrailExplanation } from '../utils/guardrailPresentation';
+import { RefreshButton } from './RefreshButton';
 export function GuardrailsPanel({ projectId }: { projectId: string }) {
   const [offset, setOffset] = useState(0);
   const [auditId, setAuditId] = useState('');
@@ -136,9 +137,7 @@ export function GuardrailsPanel({ projectId }: { projectId: string }) {
       <section className="panel">
         <div className="section-heading">
           <h2>Decisiones persistidas</h2>
-          <button className="text-button" onClick={hooks.refresh}>
-            Recargar logs
-          </button>
+          <RefreshButton resource={hooks} label="Recargar logs" disabled={hooks.evaluation.pending} />
         </div>
         <div className="filter-bar">
           <form
@@ -152,11 +151,12 @@ export function GuardrailsPanel({ projectId }: { projectId: string }) {
               Filtrar por auditoría
               <input
                 value={filterInput}
+                disabled={hooks.loading || hooks.evaluation.pending}
                 onChange={(event) => setFilterInput(event.target.value)}
                 placeholder="UUID o vacío para todas"
               />
             </label>
-            <button className="ghost">Filtrar</button>
+            <button className="ghost" disabled={hooks.loading || hooks.evaluation.pending}>Filtrar</button>
           </form>
           <label>
             Decisión
@@ -207,7 +207,7 @@ export function GuardrailsPanel({ projectId }: { projectId: string }) {
             {hooks.loading ? 'Consultando decisiones…' : 'No hay decisiones con este filtro.'}
           </Empty>
         )}
-        <Pagination offset={offset} count={hooks.data?.logs.length ?? 0} onChange={setOffset} />
+        <Pagination offset={offset} count={hooks.data?.logs.length ?? 0} onChange={setOffset} disabled={hooks.loading || hooks.evaluation.pending} />
       </section>
     </div>
   );

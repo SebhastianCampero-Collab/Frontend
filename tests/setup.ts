@@ -10,5 +10,6 @@ afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
   localStorage.clear();
+  sessionStorage.clear();
   window.history.replaceState(null, '', '/');
 });

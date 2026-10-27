@@ -163,6 +163,7 @@ export const RelativePathSchema = z
   );
 export const RepairSchema = z
   .object({
+    parentSessionId: z.uuid().optional(),
     path: RelativePathSchema,
     slug: z
       .string()

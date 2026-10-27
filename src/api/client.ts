@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { explainError } from '../utils/errors';
 import { ProjectFilesSchema } from '../types/contracts';
 import { ImportEventSchema } from '../types/contracts';
 import type { ImportEvent } from '../types/contracts';
@@ -19,13 +20,15 @@ import {
 import type { AuditRequest, ListFilter, RegisterProject } from '../types/contracts';
 
 export class ApiError extends Error {
+  readonly technicalMessage: string;
   constructor(
     message: string,
     public readonly status = 0,
     public readonly code = 'NETWORK_ERROR',
     public readonly requestId?: string,
   ) {
-    super(message);
+    super(explainError(message, status));
+    this.technicalMessage = message;
     this.name = 'ApiError';
   }
 }
@@ -277,5 +280,5 @@ export class ApiClient {
 }
 export const api = new ApiClient();
 export function message(error: unknown): string {
-  return error instanceof Error ? error.message : 'No se pudo completar la operación.';
+  return error instanceof Error ? explainError(error.message, error instanceof ApiError ? error.status : undefined) : 'No se pudo completar la operación.';
 }

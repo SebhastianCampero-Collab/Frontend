@@ -11,7 +11,7 @@ export function FileSelector({ value, onChange, files, loading, error, refresh, 
       {value && !options.some((file) => file.path === value) && <option value={value} disabled>Archivo no disponible: {value}</option>}
       {options.map((file) => <option key={file.path} value={file.path}>{file.path}</option>)}
     </select></label>
-    <button type="button" className="text-button" disabled={disabled || loading} onClick={refresh}>Actualizar archivos</button>
+    <button type="button" className="text-button" disabled={disabled || loading} onClick={refresh}>{loading ? 'Actualizando...' : 'Actualizar archivos'}</button>
     <ErrorNotice error={error} />
     {!loading && !error && files && !options.length && <p role="status">No se encontraron archivos compatibles para esta operación.</p>}
     {files?.truncated && <p className="notice">Listado parcial por límites de tamaño, profundidad o acceso. Solo se muestran archivos verificados.</p>}

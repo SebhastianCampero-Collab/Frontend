@@ -1,6 +1,7 @@
 import type { AuditDetails } from '../types/contracts';
 import { DiagnosticSchema, record } from '../types/contracts';
 import { z } from 'zod';
+import { explainError } from '../utils/errors';
 import { Badge, Empty, JsonDetails } from './ui';
 export function CodeInspector({ details }: { details: AuditDetails }) {
   const summary = details.audit.summaryJson;
@@ -29,7 +30,7 @@ export function CodeInspector({ details }: { details: AuditDetails }) {
           : failed ? 'El diagnóstico no pudo completarse. Esto no significa que el código esté libre de errores.'
           : output['truncated'] === true ? 'El diagnóstico tiene resultados parciales; no permite confirmar la ausencia de errores.'
           : 'Esta operación no tiene un diagnóstico completo disponible.'}
-        {!missingFile && typeof reason === 'string' ? ` Detalle: ${reason}` : ''}
+        {!missingFile && typeof reason === 'string' ? ` Detalle: ${explainError(reason)}` : ''}
       </p>}
       {typeof output['rootCause'] === 'string' && (
         <p className="root-cause">{output['rootCause']}</p>

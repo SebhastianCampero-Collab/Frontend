@@ -41,7 +41,7 @@ export function ProjectsPanel({
         Indica un repositorio Git existente en el equipo del backend y dentro de sus raíces
         autorizadas.
       </p>
-      <form onSubmit={(event) => void submit(event)} className="form-grid">
+      <form onSubmit={(event) => void submit(event)}><fieldset className="form-grid action-fields" disabled={pending}>
         <label>
           Nombre del proyecto
           <input name="name" required maxLength={4096} placeholder="Mi proyecto" />
@@ -68,7 +68,7 @@ export function ProjectsPanel({
         <button className="primary" disabled={pending}>
           {pending ? 'Registrando…' : 'Registrar en la base de datos'}
         </button>
-      </form>
+      </fieldset></form>
     </section>
   );
 }

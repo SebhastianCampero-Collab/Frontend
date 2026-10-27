@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { useAdvancedOptions } from './AdvancedOptions';
 import { statusLabel } from '../utils/resultPresentation';
+import { explainError } from '../utils/errors';
 export function Badge({ value }: { value: string }) {
   const tone = [
     'allow',
@@ -22,7 +23,7 @@ export function Badge({ value }: { value: string }) {
 export function ErrorNotice({ error }: { error: string | null | undefined }) {
   return error ? (
     <div className="notice danger" role="alert">
-      {error}
+      {explainError(error)}
     </div>
   ) : null;
 }
@@ -49,10 +50,12 @@ export function Pagination({
   offset,
   count,
   onChange,
+  disabled = false,
 }: {
   offset: number;
   count: number;
   onChange: (offset: number) => void;
+  disabled?: boolean;
 }) {
   return (
     <div className="pagination">
@@ -61,12 +64,12 @@ export function Pagination({
       </span>
       <button
         className="ghost"
-        disabled={offset === 0}
+        disabled={disabled || offset === 0}
         onClick={() => onChange(Math.max(0, offset - 20))}
       >
         Anterior
       </button>
-      <button className="ghost" disabled={count < 20} onClick={() => onChange(offset + 20)}>
+      <button className="ghost" disabled={disabled || count < 20} onClick={() => onChange(offset + 20)}>
         Siguiente
       </button>
     </div>
