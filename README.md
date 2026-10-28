@@ -1,5 +1,7 @@
 # DevGuardian · Dashboard de operaciones
 
+> **Entrega docente SDD y Obsidian:** consultar el repositorio independiente [DevGuardian-SDD-Obsidian](https://github.com/LuisMI2005-sudo/DevGuardian-SDD-Obsidian), que reúne el SDD del backend y frontend, el segundo cerebro, Mermaid y grafos por colores. Aquí se conserva la aplicación React y su configuración operativa de Spec Kit.
+
 ## Arquitectura objetivo: microservicios y microfrontends
 
 Objetivo solicitado: PostgreSQL relacional multitenant por servicio, principios SOLID explícitos, backend con 7 servicios de dominio y Gateway BFF/MCP, y frontend con Shell y 6 microfrontends. Diseño completo en el backend: `specs/segundo-cerebro/arquitectura-objetivo/00-Arquitectura-Objetivo.md`. Cada módulo tiene nota y relaciones, con frontend azul, backend naranja y datos verde. **Estado actualizado: perfil local multitenant implementado y en validación, con siete servicios, gateway y seis microfrontends.** El despliegue productivo y la migración de datos históricos siguen pendientes; consultar la sección de plataforma local y su evidencia.
