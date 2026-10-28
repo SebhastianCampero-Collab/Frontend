@@ -26,6 +26,7 @@ export class ApiError extends Error {
     public readonly status = 0,
     public readonly code = 'NETWORK_ERROR',
     public readonly requestId?: string,
+    public readonly rawResponse?: unknown,
   ) {
     super(explainError(message, status));
     this.technicalMessage = message;
@@ -181,7 +182,7 @@ export class ApiClient {
   runAudit = (input: AuditRequest) => this.request('/api/audits/run', AuditRunSchema, input);
   hookConfig = (signal?: AbortSignal) =>
     this.request('/api/hooks/config', HookConfigSchema, undefined, signal);
-  hookLogs = (filter: ListFilter = {}, signal?: AbortSignal) =>
+  hookLogs = (filter: ListFilter & { decision?: 'allow' | 'block' } = {}, signal?: AbortSignal) =>
     this.request(`/api/hooks/logs${query(filter)}`, z.array(HookLogSchema), undefined, signal);
   evaluateHook = (projectId: string, files: string[], unifiedDiff: string) =>
     this.request(
@@ -216,6 +217,8 @@ export class ApiClient {
         String(record(rpc['error'])['message'] ?? 'Error de protocolo MCP'),
         response.status,
         'MCP_ERROR',
+        undefined,
+        payload,
       );
     if (!response.ok || rpc['jsonrpc'] !== '2.0' || rpc['id'] !== id || !('result' in rpc))
       throw new ApiError('Respuesta JSON-RPC inválida.', response.status, 'MCP_ERROR');
@@ -276,6 +279,10 @@ export class ApiClient {
           : undefined,
       );
     return { data: envelope.data, meta: result['_meta'] };
+  }
+  /** Developer sandbox: preserve the MCP result, including isError and structuredContent. */
+  async callToolRaw(name: string, args: Record<string, unknown>, projectId: string): Promise<unknown> {
+    return this.rpc('tools/call', { name, arguments: { ...args, projectId } });
   }
 }
 export const api = new ApiClient();

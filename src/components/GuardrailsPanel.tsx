@@ -1,214 +1,46 @@
 import { useState } from 'react';
-import type { FormEvent } from 'react';
-import { ShieldCheck, ShieldX } from 'lucide-react';
-import { useHookGuardrails } from '../hooks/useHookGuardrails';
-import { Badge, Empty, ErrorNotice, JsonDetails, Pagination } from './ui';
-import { guardrailExplanation } from '../utils/guardrailPresentation';
+import { useSecurityDashboard, SECURITY_PAGE_SIZE } from '../hooks/useSecurityDashboard';
+import { interceptedFile } from '../utils/securityDashboard';
+import { explainError } from '../utils/errors';
+import { SecurityPolicies } from './SecurityPolicies';
 import { RefreshButton } from './RefreshButton';
+import { Empty, ErrorNotice, JsonDetails, Pagination } from './ui';
+
 export function GuardrailsPanel({ projectId }: { projectId: string }) {
   const [offset, setOffset] = useState(0);
   const [auditId, setAuditId] = useState('');
-  const [filterInput, setFilterInput] = useState('');
-  const [decision, setDecision] = useState('all');
-  const hooks = useHookGuardrails(projectId, auditId, offset);
-  const [file, setFile] = useState('src/guardrail.ts');
-  const [diff, setDiff] = useState('+export const verified = true;');
-  const [loaded, setLoaded] = useState(false);
-  const loadExample = (path: string, content: string) => {
-    setFile(path); setDiff(content); setLoaded(true); hooks.evaluation.reset();
-  };
-  const edit = () => { setLoaded(false); hooks.evaluation.reset(); };
-  const evaluate = (files: string[], patch: string) => {
-    void hooks.evaluateGuardrail(files, patch).catch(() => {});
-  };
-  const submit = (event: FormEvent) => {
-    event.preventDefault();
-    if (hooks.evaluation.pending) return;
-    setLoaded(false);
-    evaluate(
-      file
-        .split(',')
-        .map((value) => value.trim())
-        .filter(Boolean),
-      diff,
-    );
-  };
-  const logs =
-    hooks.data?.logs.filter((log) => decision === 'all' || log.decision === decision) ?? [];
-  return (
-    <div className="stack">
-      <section className="panel">
-        <div className="section-heading">
-          <div>
-            <span className="eyebrow">02 / POLÍTICAS ACTIVAS</span>
-            <h2>Hooks & Guardrails</h2>
-          </div>
-          <span className={`badge ${hooks.data?.config.enabled ? 'good' : 'neutral'}`}>{hooks.data ? hooks.data.config.enabled ? 'Hooks habilitados' : 'Hooks deshabilitados' : 'Consultando reglas'}</span>
-        </div>
-        <p>
-          Prepara los datos y pulsa Comprobar seguridad para consultar las reglas del backend. Esta comprobación no aplica parches ni modifica archivos; registra la decisión en el historial.
-        </p>
-        <ErrorNotice error={hooks.error} />
-        {hooks.data && (
-          <div className="policy-chips">
-            {Object.entries(hooks.data.config.rules).map(([rule, enabled]) => (
-              <span key={rule} className={enabled ? 'policy enabled' : 'policy'}>
-                {enabled ? <ShieldCheck size={14} /> : <ShieldX size={14} />}
-                {rule}
-              </span>
-            ))}
-            <JsonDetails
-              value={hooks.data.config}
-              label="Configuración efectiva y archivos protegidos"
-            />
-          </div>
-        )}
-      </section>
-      <section className="panel">
-        <div className="section-heading">
-          <h2>Comprobar la seguridad de un cambio</h2>
-          <span className="eyebrow">PREFLIGHT / SIN MUTACIÓN</span>
-        </div>
-        <div className="demo-buttons">
-          <button
-            type="button"
-            className="ghost"
-            disabled={hooks.evaluation.pending}
-            onClick={() => loadExample('src/guardrail.ts', '+export const verified = true;')}
-          >
-            Permitido
-          </button>
-          <button
-            type="button"
-            className="danger-button"
-            disabled={hooks.evaluation.pending}
-            onClick={() => loadExample('.env', '+DEMO_VALUE=blocked')}
-          >
-            Archivo protegido
-          </button>
-          <button
-            type="button"
-            className="ghost"
-            disabled={hooks.evaluation.pending}
-            onClick={() => loadExample('src/guardrail.ts', '+SECRET_KEY=demonstration')}
-          >
-            Secreto ficticio
-          </button>
-        </div>
-        <p>Los ejemplos solo rellenan el formulario. El resultado se obtiene al comprobarlo.</p>
-        {loaded && <p role="status" className="notice">Archivo y contenido cargados. Revisa los datos y pulsa Comprobar seguridad para enviarlos.</p>}
-        <form className="form-grid" onSubmit={submit}>
-          <label>
-            Archivos (separados por coma)
-            <input value={file} onChange={(event) => { setFile(event.target.value); edit(); }} required disabled={hooks.evaluation.pending} />
-          </label>
-          <label className="wide">
-            Contenido del parche
-            <textarea
-              rows={3}
-              value={diff}
-              onChange={(event) => { setDiff(event.target.value); edit(); }}
-              disabled={hooks.evaluation.pending}
-              required
-              spellCheck={false}
-            />
-          </label>
-          <button type="submit" className="primary" disabled={hooks.evaluation.pending}>
-            {hooks.evaluation.pending ? 'Comprobando…' : 'Comprobar seguridad'}
-          </button>
-        </form>
-        <ErrorNotice error={hooks.evaluation.error} />
-        {hooks.evaluation.data && (
-          <div className="evaluation-result" role="status">
-            <span className={`badge ${hooks.evaluation.data.decision === 'block' ? 'bad' : 'good'}`}>{hooks.evaluation.data.decision === 'block' ? 'Bloqueado' : 'Permitido'}</span>
-            <span>
-              Auditoría: <code>{hooks.evaluation.data.auditId}</code>
-            </span>
-            <p>
-              {guardrailExplanation(hooks.evaluation.data.decision, hooks.evaluation.data.hookLogs
-                .filter((log) => log.decision === hooks.evaluation.data?.decision)
-                .map((log) => log.reason)
-                )}
-            </p>
-            <JsonDetails value={hooks.evaluation.data} />
-          </div>
-        )}
-      </section>
-      <section className="panel">
-        <div className="section-heading">
-          <h2>Decisiones persistidas</h2>
-          <RefreshButton resource={hooks} label="Recargar logs" disabled={hooks.evaluation.pending} />
-        </div>
-        <div className="filter-bar">
-          <form
-            onSubmit={(event) => {
-              event.preventDefault();
-              setAuditId(filterInput.trim());
-              setOffset(0);
-            }}
-          >
-            <label>
-              Filtrar por auditoría
-              <input
-                value={filterInput}
-                disabled={hooks.loading || hooks.evaluation.pending}
-                onChange={(event) => setFilterInput(event.target.value)}
-                placeholder="UUID o vacío para todas"
-              />
-            </label>
-            <button className="ghost" disabled={hooks.loading || hooks.evaluation.pending}>Filtrar</button>
-          </form>
-          <label>
-            Decisión
-            <select value={decision} onChange={(event) => setDecision(event.target.value)}>
-              <option value="all">Todas en esta página</option>
-              <option value="allow">ALLOW</option>
-              <option value="block">BLOCK</option>
-              <option value="warn">WARN</option>
-            </select>
-          </label>
-        </div>
-        {logs.length ? (
-          <div className="table-scroll">
-            <table>
-              <thead>
-                <tr>
-                  <th>Decisión</th>
-                  <th>Hook / evento</th>
-                  <th>Motivo</th>
-                  <th>Registro</th>
-                </tr>
-              </thead>
-              <tbody>
-                {logs.map((log) => (
-                  <tr key={log.id}>
-                    <td>
-                      <Badge value={log.decision} />
-                    </td>
-                    <td>
-                      <strong>{log.hookName}</strong>
-                      <code>{log.event}</code>
-                    </td>
-                    <td>
-                      {log.reason}
-                      <JsonDetails value={log.metadataJson} label="Metadatos" />
-                    </td>
-                    <td>
-                      <time>{new Date(log.createdAt).toLocaleString()}</time>
-                      <code>{log.auditId}</code>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ) : (
-          <Empty>
-            {hooks.loading ? 'Consultando decisiones…' : 'No hay decisiones con este filtro.'}
-          </Empty>
-        )}
-        <Pagination offset={offset} count={hooks.data?.logs.length ?? 0} onChange={setOffset} disabled={hooks.loading || hooks.evaluation.pending} />
-      </section>
-    </div>
-  );
+  const [input, setInput] = useState('');
+  const security = useSecurityDashboard(projectId, auditId, offset);
+  const logs = [...new Map((security.data?.logs ?? []).filter((log) => log.decision === 'block').map((log) => [log.id, log])).values()]
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  return <div className="stack">
+    <section className="panel"><span className="eyebrow">SEGURIDAD / AUDITORÍA DEL PROYECTO</span><h2>Dashboard de Auditoría de Seguridad</h2>
+      <p>Consulta las políticas configuradas y las operaciones que el backend bloqueó. Este panel no envía parches ni ejecuta comprobaciones manuales.</p>
+      <ErrorNotice error={security.error} />
+    </section>
+    {security.data ? <SecurityPolicies config={security.data.config} stale={Boolean(security.error)} /> : <Empty>{security.loading ? 'Consultando políticas del backend…' : 'No se pudo verificar la configuración de seguridad.'}</Empty>}
+    <section className="panel" aria-labelledby="interceptions-title">
+      <div className="section-heading"><h2 id="interceptions-title">Registro de Intercepciones</h2><RefreshButton resource={security} label="Actualizar intercepciones" /></div>
+      <p role="status">{security.error ? 'Conexión interrumpida: el registro puede estar desactualizado.' : security.loading ? 'Actualizando el registro desde el backend…' : 'Actualización automática cada 5 segundos mientras esta pestaña esté visible.'}</p>
+      <form className="filter-bar" onSubmit={(event) => { event.preventDefault(); setAuditId(input.trim()); setOffset(0); }}>
+        <label>Filtrar por auditoría<input value={input} disabled={security.loading} onChange={(event) => setInput(event.target.value)} pattern="[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}" placeholder="UUID o vacío para todo el proyecto" /></label>
+        <button className="ghost" disabled={security.loading}>Filtrar intercepciones</button>
+      </form>
+      <div className="security-console" role="region" aria-label="Consola de intercepciones bloqueadas" tabIndex={0}>
+        {logs.length ? <table><caption>Bloqueos registrados por el backend, ordenados del más reciente al más antiguo.</caption><thead><tr><th>Fecha y hora</th><th>Archivo involucrado</th><th>Motivo del bloqueo</th><th>Evidencia</th></tr></thead><tbody>
+          {logs.map((log) => {
+            const explicit = interceptedFile(log);
+            const target = security.targets.data?.[log.auditId];
+            return <tr key={log.id}><td><time dateTime={log.createdAt}>{new Date(log.createdAt).toLocaleString()}</time></td>
+              <td><code>{explicit ?? (target ? `Objetivo de la auditoría: ${target}` : security.targets.loading ? 'Consultando archivo…' : 'Archivo no informado por el backend')}</code></td>
+              <td><span className="badge bad">Bloqueado</span><p>{explainError(log.reason)}</p></td>
+              <td><span>{log.hookName} · {log.event}</span><code>{log.auditId}</code><JsonDetails value={log.metadataJson} label="Metadatos de la intercepción" /></td>
+            </tr>;
+          })}
+        </tbody></table> : <Empty>{security.loading ? 'Consultando intercepciones…' : security.error ? 'No se pudo verificar si hay bloqueos. Reintenta la consulta.' : 'No hay bloqueos en esta página de registros. Esto no implica que el proyecto esté libre de riesgos.'}</Empty>}
+      </div>
+      <p><small>Cada página consulta hasta {SECURITY_PAGE_SIZE} bloqueos del backend. El archivo objetivo de una auditoría no identifica necesariamente todos los archivos afectados.</small></p>
+      <Pagination offset={offset} count={security.data?.logs.length ?? 0} onChange={setOffset} disabled={security.loading} />
+    </section>
+  </div>;
 }

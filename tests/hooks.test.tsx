@@ -104,7 +104,7 @@ describe('dedicated UI hooks', () => {
   });
   it('useMcpTools uses live tool catalog and project-scoped invocations', async () => {
     vi.spyOn(api, 'listTools').mockResolvedValue(tools);
-    const call = vi.spyOn(api, 'callTool').mockResolvedValue({ data: { clean: true }, meta: {} });
+    const call = vi.spyOn(api, 'callToolRaw').mockResolvedValue({ data: { clean: true }, meta: {} });
     const { result } = renderHook(() => useMcpTools(project.id));
     await waitFor(() => expect(result.current.data).toHaveLength(19));
     await act(async () => {

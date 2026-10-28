@@ -5,10 +5,10 @@ import { useAction, useResource } from './useResource';
 export function useMcpTools(projectId: string) {
   const loader = useCallback((signal: AbortSignal) => api.listTools(signal), []);
   const catalog = useResource(loader, 'mcp-tools');
-  const invocation = useAction<Awaited<ReturnType<typeof api.callTool>>>();
+  const invocation = useAction<Awaited<ReturnType<typeof api.callToolRaw>>>();
   const call = (name: string, args: Record<string, unknown>) => {
     if (!projectId) return Promise.reject(new Error('Selecciona un proyecto.'));
-    return invocation.execute(() => api.callTool(name, args, projectId));
+    return invocation.execute(() => api.callToolRaw(name, args, projectId));
   };
   return { ...catalog, invocation, call };
 }

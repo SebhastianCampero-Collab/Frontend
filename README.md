@@ -1,5 +1,9 @@
 # DevGuardian · Dashboard de operaciones
 
+**MCP y edición JSON** funciona como un sandbox de peticiones: selector del catálogo real, borrador JSON generado desde los campos requeridos del `inputSchema` y respuesta MCP sin transformar en una segunda columna. Seleccionar una herramienta solo prepara el editor; **Ejecutar petición** envía la llamada. Completa las cadenas vacías con valores reales y consulta el esquema desplegable para los campos opcionales. El `projectId` siempre corresponde al proyecto seleccionado. Los guardrails del backend siguen activos y las herramientas pueden modificar ese workspace: no es una simulación ni un contenedor aislado. Los controles se bloquean durante la petición y cambiar de proyecto limpia el editor y la respuesta.
+
+**Trazas de subagentes** incluye un visor estilo terminal, filtros por rol y exportación JSON de la telemetría visible. Ver [Telemetría de subagentes](TELEMETRIA_SUBAGENTES.md).
+
 Las recargas muestran su estado y las reparaciones se siguen mediante evidencia del backend, sin progreso simulado. Ver [feedback asíncrono y recuperación](FEEDBACK_ASINCRONO.md).
 
 Los resultados comienzan con una explicación en lenguaje claro y accesos a pruebas, cambios y detalles técnicos. Ver [Resultados comprensibles](RESULTADOS_COMPRENSIBLES.md).
@@ -29,7 +33,7 @@ Los secretos se configuran en Environment de Render. Las copias locales `.env` e
 
 El resultado DIAGNOSED conserva outcome=diagnosed y traza completed; la sesión DB mantiene status=blocked por el contrato histórico, pues diagnosticar no autoriza un commit. No es un error.
 
-En **Hooks y guardrails**, los botones **Permitido**, **Archivo protegido** y **Secreto ficticio** solo cargan texto en el formulario, sin enviar peticiones. Después de revisar los campos, pulsar **Comprobar seguridad** para solicitar el preflight al backend. El resultado explica el permiso o bloqueo y se guarda en el historial sin modificar archivos. Cambiar de ejemplo o editar los datos descarta el resultado anterior; no borra registros persistidos.
+En **Hooks y guardrails** se muestra el **Dashboard de Auditoría de Seguridad**: políticas del backend y un Registro de Intercepciones actualizado automáticamente cada cinco segundos mientras la pestaña está visible. Ya no hay ejemplos ni formulario de evaluación manual. Este panel solo consulta registros; no envía parches ni altera políticas. Ver [Dashboard de seguridad](DASHBOARD_SEGURIDAD.md).
 
 El dashboard ya no ofrece botones de carga de demos ni selecciona proyectos de ejemplo automáticamente. Los registros generados con el prefijo reservado `Demo Render ` o ubicados bajo `.devguardian-demo/` quedan ocultos del selector y del contador principal. Se conservan en la BD junto con su historial, sin eliminarlos. El endpoint técnico `/api/demo/prepare` del backend no se modifica ni se invoca desde el dashboard.
 

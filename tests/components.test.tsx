@@ -166,36 +166,26 @@ describe('dashboard views', () => {
     await screen.findByRole('alert');
     expect(run).not.toHaveBeenCalled();
   });
-  it('triggers an actual guardrail call and displays BLOCK evidence', async () => {
+  it('shows persisted security interceptions without sending an evaluation', async () => {
     vi.spyOn(api, 'hookConfig').mockResolvedValue(config);
     vi.spyOn(api, 'hookLogs').mockResolvedValue([log]);
-    const evaluate = vi.spyOn(api, 'evaluateHook').mockResolvedValue({
-      ...details,
-      hookLogs: [log],
-      auditId: details.audit.id,
-      decision: 'block',
-    });
+    const evaluate = vi.spyOn(api, 'evaluateHook');
     render(<GuardrailsPanel projectId={project.id} />);
-    fireEvent.click(screen.getByRole('button', { name: 'Archivo protegido' }));
+    expect(await screen.findByRole('heading', { name: 'Políticas de Seguridad Activas' })).toBeInTheDocument();
+    const console = screen.getByRole('region', { name: 'Consola de intercepciones bloqueadas' });
+    expect(within(console).getByText('Bloqueado')).toBeInTheDocument();
+    expect(within(console).getByText(log.reason)).toBeInTheDocument();
     expect(evaluate).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole('button', { name: 'Comprobar seguridad' }));
-    await waitFor(() =>
-      expect(evaluate).toHaveBeenCalledWith(project.id, ['.env'], '+DEMO_VALUE=blocked'),
-    );
-    const status = await screen.findByRole('status');
-    expect(within(status).getByText('Bloqueado')).toBeInTheDocument();
-    expect(within(status).getByText('Bloqueado porque .env es un archivo protegido. No se modificó ningún archivo.')).toBeInTheDocument();
-    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
   it.each(['diagnostic', 'verification', 'patch-safety'] as const)(
     'shows the %s worker, tools and consumed result when returned by the backend',
     async (role) => {
       vi.spyOn(api, 'delegations').mockResolvedValue([{ ...delegation, role }]);
       render(<AgentMonitorView projectId={project.id} />);
-      await screen.findByText('worker-1');
-      expect(screen.getByRole('heading', { name: role })).toBeInTheDocument();
+      await screen.findAllByText('worker-1');
+      expect(screen.getByRole('button', { name: role === 'diagnostic' ? 'Diagnóstico' : role === 'verification' ? 'Verificación' : 'Seguridad' })).toBeInTheDocument();
       expect(screen.getByText('diagnosis_only')).toBeInTheDocument();
-      expect(screen.getByText('analyze_code · completed')).toBeInTheDocument();
+      expect(screen.getByText('analyze_code')).toBeInTheDocument();
     },
   );
   it('shows a real empty state instead of random delegation events', async () => {
@@ -207,28 +197,28 @@ describe('dashboard views', () => {
   it('lists 19 tools, invokes tools/call and displays the actual response', async () => {
     vi.spyOn(api, 'listTools').mockResolvedValue(tools);
     const call = vi
-      .spyOn(api, 'callTool')
+      .spyOn(api, 'callToolRaw')
       .mockResolvedValue({ data: { clean: true }, meta: { auditId: details.audit.id } });
     render(<McpPanel projectId={project.id} />);
     await screen.findByText('19 tools');
-    fireEvent.click(screen.getByRole('button', { name: 'Ejecutar herramienta' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Ejecutar petición' }));
     await waitFor(() => expect(call).toHaveBeenCalledWith('git_status', {}, project.id));
     await screen.findByText(/"clean": true/);
   });
   it('rejects non-object MCP arguments without calling the backend', async () => {
     vi.spyOn(api, 'listTools').mockResolvedValue(tools);
-    const call = vi.spyOn(api, 'callTool');
+    const call = vi.spyOn(api, 'callToolRaw');
     render(<McpPanel projectId={project.id} />);
     await screen.findByText('19 tools');
     fireEvent.change(screen.getByLabelText('Argumentos JSON'), { target: { value: '[]' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Ejecutar herramienta' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Ejecutar petición' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('objeto JSON');
     expect(call).not.toHaveBeenCalled();
   });
   it('locks the MCP tool and argument editor until the current invocation returns', async () => {
     vi.spyOn(api, 'listTools').mockResolvedValue(tools);
     let finish!: (value: { data: unknown; meta: unknown }) => void;
-    vi.spyOn(api, 'callTool').mockImplementation(
+    vi.spyOn(api, 'callToolRaw').mockImplementation(
       () =>
         new Promise((resolve) => {
           finish = resolve;
@@ -236,8 +226,8 @@ describe('dashboard views', () => {
     );
     render(<McpPanel projectId={project.id} />);
     await screen.findByText('19 tools');
-    fireEvent.click(screen.getByRole('button', { name: 'Ejecutar herramienta' }));
-    expect(screen.getByRole('button', { name: /^analyze_code$/ })).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: 'Ejecutar petición' }));
+    expect(screen.getByLabelText('Herramienta MCP')).toBeDisabled();
     expect(screen.getByLabelText('Argumentos JSON')).toBeDisabled();
     finish({ data: { clean: true }, meta: {} });
     await waitFor(() => expect(screen.getByLabelText('Argumentos JSON')).toBeEnabled());

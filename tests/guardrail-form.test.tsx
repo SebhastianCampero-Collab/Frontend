@@ -1,86 +1,84 @@
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { api } from '../src/api/client';
 import { GuardrailsPanel } from '../src/components/GuardrailsPanel';
 import { config, details, log, project } from './fixtures';
 
-const blocked = { ...details, auditId: details.audit.id, decision: 'block' as const, hookLogs: [{ ...log, reason: 'Protected file: .env' }] };
 beforeEach(() => {
   vi.spyOn(api, 'hookConfig').mockResolvedValue(config);
   vi.spyOn(api, 'hookLogs').mockResolvedValue([]);
 });
-describe('explicit guardrail evaluation', () => {
-  it('loads all examples without an evaluation or an extra resource request', async () => {
+afterEach(() => vi.useRealTimers());
+describe('read-only security dashboard', () => {
+  it('removes examples and the manual evaluation form and never evaluates on load or refresh', async () => {
     const evaluate = vi.spyOn(api, 'evaluateHook');
     render(<GuardrailsPanel projectId={project.id} />);
-    await screen.findByText('Hooks habilitados');
-    const configCalls = vi.mocked(api.hookConfig).mock.calls.length;
-    const logCalls = vi.mocked(api.hookLogs).mock.calls.length;
-    const examples = [
-      ['Archivo protegido', '.env', '+DEMO_VALUE=blocked'],
-      ['Secreto ficticio', 'src/guardrail.ts', '+SECRET_KEY=demonstration'],
-      ['Permitido', 'src/guardrail.ts', '+export const verified = true;'],
-    ] as const;
-    for (const [label, path, content] of examples) {
-      fireEvent.click(screen.getByRole('button', { name: label }));
-      expect(screen.getByLabelText('Archivos (separados por coma)')).toHaveValue(path);
-      expect(screen.getByLabelText('Contenido del parche')).toHaveValue(content);
-      expect(screen.getByText(/Archivo y contenido cargados/)).toBeInTheDocument();
-    }
+    await screen.findByRole('heading', { name: 'Políticas de Seguridad Activas' });
+    for (const name of ['Permitido', 'Archivo protegido', 'Secreto ficticio', 'Comprobar seguridad']) expect(screen.queryByRole('button', { name })).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Contenido del parche')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Actualizar intercepciones' }));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Actualizar intercepciones' })).toBeEnabled());
     expect(evaluate).not.toHaveBeenCalled();
-    expect(api.hookConfig).toHaveBeenCalledTimes(configCalls);
-    expect(api.hookLogs).toHaveBeenCalledTimes(logCalls);
+    expect(api.hookLogs).toHaveBeenCalledWith({ projectId: project.id, decision: 'block', limit: 20, offset: 0 }, expect.any(AbortSignal));
   });
-  it('submits edited data only on the explicit action and explains protected files', async () => {
-    const evaluate = vi.spyOn(api, 'evaluateHook').mockResolvedValue(blocked);
+  it('uses real backend limits and rule overrides instead of fictitious policies', async () => {
+    vi.spyOn(api, 'hookConfig').mockResolvedValue({ ...config, maxFiles: 7, maxPatchCharacters: 350, allowedBranches: ['fix/safe-*'], rules: { 'protected-files-and-secrets': false } });
     render(<GuardrailsPanel projectId={project.id} />);
-    fireEvent.click(screen.getByRole('button', { name: 'Permitido' }));
-    fireEvent.change(screen.getByLabelText('Archivos (separados por coma)'), { target: { value: '.env' } });
-    expect(evaluate).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole('button', { name: 'Comprobar seguridad' }));
-    await screen.findByText('Bloqueado porque .env es un archivo protegido. No se modificó ningún archivo.');
-    expect(evaluate).toHaveBeenCalledExactlyOnceWith(project.id, ['.env'], '+export const verified = true;');
-    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    const heading = await screen.findByRole('heading', { name: 'Bloqueo de archivos protegidos' });
+    expect(within(heading.closest('article') as HTMLElement).getByText('Desactivada')).toBeInTheDocument();
+    expect(screen.getByText('Hasta 7 archivos y 350 caracteres.')).toBeInTheDocument();
+    expect(screen.getByText('fix/safe-*')).toBeInTheDocument();
+    expect(screen.getByText(/Los tiempos|tiempos límite pertenecen/)).toBeInTheDocument();
   });
-  it('removes an old outcome when preparing or editing another scenario', async () => {
-    const evaluate = vi.spyOn(api, 'evaluateHook').mockResolvedValue(blocked);
+  it('does not show enabled protection when hooks are disabled', async () => {
+    vi.spyOn(api, 'hookConfig').mockResolvedValue({ ...config, enabled: false });
     render(<GuardrailsPanel projectId={project.id} />);
-    fireEvent.click(screen.getByRole('button', { name: 'Archivo protegido' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Comprobar seguridad' }));
-    await screen.findByText('Bloqueado');
-    fireEvent.click(screen.getByRole('button', { name: 'Secreto ficticio' }));
-    expect(screen.queryByText('Bloqueado')).not.toBeInTheDocument();
-    expect(evaluate).toHaveBeenCalledTimes(1);
-    fireEvent.change(screen.getByLabelText('Contenido del parche'), { target: { value: '+const x = 1;' } });
-    expect(screen.queryByText(/Archivo y contenido cargados/)).not.toBeInTheDocument();
+    await screen.findByText('0 activas en la última configuración recibida');
+    expect(screen.queryByText('Activa')).not.toBeInTheDocument();
+    expect(screen.getByText(/hooks están deshabilitados/)).toBeInTheDocument();
   });
-  it('uses the backend decision rather than the example name', async () => {
-    vi.spyOn(api, 'evaluateHook').mockResolvedValue({ ...blocked, decision: 'allow', hookLogs: [] });
+  it('shows only actual blocks, timestamps, filenames and reasons without duplicating log IDs', async () => {
+    const blocked = { ...log, reason: 'Protected file: .env' };
+    vi.spyOn(api, 'hookLogs').mockResolvedValue([blocked, blocked, { ...log, id: 'allow', decision: 'allow', reason: 'allowed operation' }]);
     render(<GuardrailsPanel projectId={project.id} />);
-    fireEvent.click(screen.getByRole('button', { name: 'Archivo protegido' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Comprobar seguridad' }));
-    await screen.findByText('Permitido por las reglas configuradas en el backend. No se modificó ningún archivo.');
-    expect(screen.queryByText('Bloqueado')).not.toBeInTheDocument();
+    await screen.findByText('Protected file: .env');
+    const console = screen.getByRole('region', { name: 'Consola de intercepciones bloqueadas' });
+    expect(within(console).getByText('.env')).toBeInTheDocument();
+    expect(within(console).getAllByRole('row')).toHaveLength(2);
+    expect(within(console).queryByText('allowed operation')).not.toBeInTheDocument();
+    expect(console.querySelector('time')).toHaveAttribute('datetime', log.createdAt);
   });
-  it('prevents changing prepared inputs or double-submitting while waiting', async () => {
-    let finish!: (value: typeof blocked) => void;
-    const evaluate = vi.spyOn(api, 'evaluateHook').mockImplementation(() => new Promise((resolve) => { finish = resolve; }));
+  it('fetches an associated audit target without claiming it identifies every affected file', async () => {
+    vi.spyOn(api, 'hookLogs').mockResolvedValue([{ ...log, reason: 'Secret pattern detected in added content.' }]);
+    vi.spyOn(api, 'audit').mockResolvedValue(details);
     render(<GuardrailsPanel projectId={project.id} />);
-    fireEvent.click(screen.getByRole('button', { name: 'Archivo protegido' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Comprobar seguridad' }));
-    expect(screen.getByRole('button', { name: 'Comprobando…' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'Permitido' })).toBeDisabled();
-    expect(screen.getByLabelText('Contenido del parche')).toBeDisabled();
-    fireEvent.click(screen.getByRole('button', { name: 'Comprobando…' }));
-    expect(evaluate).toHaveBeenCalledTimes(1);
-    await act(async () => finish(blocked));
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Comprobar seguridad' })).toBeEnabled());
+    expect(await screen.findByText('Objetivo de la auditoría: src/bug.ts')).toBeInTheDocument();
+    expect(api.audit).toHaveBeenCalledWith(details.audit.id, expect.any(AbortSignal));
   });
-  it('explains a fictitious secret from the actual blocking reason', async () => {
-    vi.spyOn(api, 'evaluateHook').mockResolvedValue({ ...blocked, hookLogs: [{ ...log, reason: 'Secret pattern detected in added content.' }] });
+  it('does not use a target returned for another project', async () => {
+    vi.spyOn(api, 'hookLogs').mockResolvedValue([{ ...log, reason: 'Secret pattern detected in added content.' }]);
+    vi.spyOn(api, 'audit').mockResolvedValue({ ...details, project: { ...project, id: '33333333-3333-4333-8333-333333333333' } });
     render(<GuardrailsPanel projectId={project.id} />);
-    fireEvent.click(screen.getByRole('button', { name: 'Secreto ficticio' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Comprobar seguridad' }));
-    await screen.findByText('Bloqueado porque el contenido coincide con un patrón de secreto. No se modificó ningún archivo.');
+    await screen.findByText('Archivo no informado por el backend');
+    expect(screen.queryByText('Objetivo de la auditoría: src/bug.ts')).not.toBeInTheDocument();
+  });
+  it('updates the console from backend polling without inventing interception events', async () => {
+    vi.useFakeTimers();
+    const get = vi.spyOn(api, 'hookLogs').mockResolvedValueOnce([]).mockResolvedValue([{ ...log, reason: 'Protected file: .env' }]);
+    render(<GuardrailsPanel projectId={project.id} />);
+    await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+    expect(screen.queryByText('Protected file: .env')).not.toBeInTheDocument();
+    await act(async () => { await vi.advanceTimersByTimeAsync(5000); });
+    expect(get).toHaveBeenCalledTimes(2);
+    expect(screen.getByText('Protected file: .env')).toBeInTheDocument();
+  });
+  it('preserves visible old records with a stale warning when a refresh fails', async () => {
+    vi.spyOn(api, 'hookLogs').mockResolvedValueOnce([log]).mockRejectedValue(new Error('network failed'));
+    render(<GuardrailsPanel projectId={project.id} />);
+    await screen.findByText(log.reason);
+    fireEvent.click(screen.getByRole('button', { name: 'Actualizar intercepciones' }));
+    await screen.findByText(/No se pudo actualizar la configuración/);
+    expect(screen.getByText(log.reason)).toBeInTheDocument();
+    expect(screen.getByText(/Conexión interrumpida/)).toBeInTheDocument();
   });
 });
