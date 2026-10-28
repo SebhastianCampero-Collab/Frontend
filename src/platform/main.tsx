@@ -1,0 +1,10 @@
+import { createRoot } from 'react-dom/client';
+import Shell from './Shell';
+import '../index.css';
+import '../styles/light-theme.css';
+import '../styles/themes.css';
+import { applyTheme, readTheme } from '../hooks/useTheme';
+applyTheme(readTheme());
+const container = document.getElementById('root');
+if (!container) throw new Error('Contenedor principal no disponible.');
+createRoot(container).render(<Shell />);

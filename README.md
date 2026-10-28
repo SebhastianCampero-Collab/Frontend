@@ -1,5 +1,21 @@
 # DevGuardian · Dashboard de operaciones
 
+## Arquitectura objetivo: microservicios y microfrontends
+
+Objetivo solicitado: PostgreSQL relacional multitenant por servicio, principios SOLID explícitos, backend con 7 servicios de dominio y Gateway BFF/MCP, y frontend con Shell y 6 microfrontends. Diseño completo en el backend: `specs/segundo-cerebro/arquitectura-objetivo/00-Arquitectura-Objetivo.md`. Cada módulo tiene nota y relaciones, con frontend azul, backend naranja y datos verde. **Estado actualizado: perfil local multitenant implementado y en validación, con siete servicios, gateway y seis microfrontends.** El despliegue productivo y la migración de datos históricos siguen pendientes; consultar la sección de plataforma local y su evidencia.
+
+## Segundo cerebro y contexto del asistente
+
+`AGENTS.md` contiene instrucciones del repositorio y `CODEX.md` registra contexto documental. Segundo cerebro canónico en el repositorio backend: `specs/segundo-cerebro/00-Segundo-cerebro.md`. Organiza la lectura crítica del PDF, arquitectura, seguridad, IA y verificación. GameZone se mantiene separado. En Obsidian, seleccionar la bóveda `ProyectoCertiIA` y abrir `specs/segundo-cerebro/00-Segundo-cerebro`. Todo el conocimiento de DevGuardian reside ahora en esa carpeta; GameZone permanece en `practica`. Los grafos distinguen categorías con colores y etiquetas.
+
+## Desarrollo guiado por especificaciones (SDD)
+
+Esta carpeta ya está registrada como bóveda local de Obsidian. Si aparece **Display Mermaid diagrams in this vault?**, pulsa **Allow** tú mismo para permitir el render nativo. Abre `specs/README.md` como índice.
+
+Spec Kit 0.8.9 está inicializado con integración Codex y scripts PowerShell. Ver el [índice SDD para Obsidian](specs/README.md), la [Constitución](specs/constitution.md) y el [Plan técnico](specs/001-sdd-foundation/plan.md). Las plantillas operativas están en `.specify/templates/`; las habilidades instaladas en `.agents/skills/`. Las copias visibles en `specs/` permiten abrir esta raíz como bóveda de Obsidian y renderizar los bloques Mermaid nativamente en Vista de lectura o Live Preview, sin plugins.
+
+Ejecutar `npm run sdd:sync` después de cambiar las fuentes y `npm run sdd:check` para comprobar copias, enlaces y estructura Mermaid. Los futuros diagramas técnicos, de datos y de procesos deben seguir estas plantillas. Esta adopción documental no cambia la aplicación ni sustituye sus pruebas.
+
 La cabecera incluye un selector **Claro / Oscuro**. Claro es el tema predeterminado; Oscuro usa superficies grafito y acentos luminosos. La preferencia se guarda en `localStorage` bajo `devguardian.theme`, se restaura antes de pintar la aplicación y se sincroniza entre pestañas. Si el navegador impide guardar preferencias, el selector sigue funcionando durante la visita. Ambos temas comparten el layout, la accesibilidad y los controles de seguridad. La paleta oscura y los colores semánticos compartidos se definen en `src/styles/themes.css`.
 
 **MCP y edición JSON** funciona como un sandbox de peticiones: selector del catálogo real, borrador JSON generado desde los campos requeridos del `inputSchema` y respuesta MCP sin transformar en una segunda columna. Seleccionar una herramienta solo prepara el editor; **Ejecutar petición** envía la llamada. Completa las cadenas vacías con valores reales y consulta el esquema desplegable para los campos opcionales. El `projectId` siempre corresponde al proyecto seleccionado. Los guardrails del backend siguen activos y las herramientas pueden modificar ese workspace: no es una simulación ni un contenedor aislado. Los controles se bloquean durante la petición y cambiar de proyecto limpia el editor y la respuesta.
@@ -190,3 +206,17 @@ Verificación local: `npm run check`, `npm run build` y `npm test`. Las pruebas 
 El formulario recuerda la ruta elegida por proyecto y backend en el almacenamiento local del navegador. Si no existe una selección guardada, puede recuperar el archivo de un diagnóstico exitoso del historial; no presupone que el repositorio contenga `src/server/contracts.ts`. Sin una ruta conocida, solicita elegir un archivo.
 
 El panel AST distingue diagnósticos completos, incompletos y resultados parciales. Solo muestra «0 hallazgos» cuando hay evidencia de un diagnóstico completado sin hallazgos. Un archivo inexistente muestra su ruta y pide corregirla. Estas regresiones se verifican en `tests/audit-state.test.tsx`.
+
+
+## Evaluación integral del producto
+
+El informe canónico está en el backend, `specs/segundo-cerebro/auditoria-integral/00-Informe-Integral.md`: metodología, evidencia de ambos repositorios, hallazgos y propuesta comercial/marketing. Los logs de esta revisión frontend están en `specs/segundo-cerebro/auditoria-integral/evidencia/`. No representan una certificación ni una auditoría exhaustiva de producción.
+# Perfil de Shell y microfrontends multitenant
+
+La nueva plataforma local se construye con `npm run build:platform` y se abre con `npm run preview:platform` en `http://127.0.0.1:5173/`. Requiere el gateway multitenant del backend en `http://127.0.0.1:4107`. `npm run dev` conserva la aplicación anterior para comparación.
+
+Incluye login, selección de organización, reinicio del workspace al cambiar de tenant y seis microfrontends ESM con contrato `mount/update/unmount`: proyectos, revisión, resultados, seguridad, subagentes y MCP. Las sesiones se mantienen en memoria; el servidor valida la organización y los permisos en cada solicitud. Los guardrails permanecen activos en ambos modos.
+
+Los bundles y su manifiesto quedan en `dist-platform/`. `npm run build:remote -- review` reconstruye solo revisión; los remotos se publican desde el mismo origen y con nombres por hash. No se cargan módulos desde URLs arbitrarias. Cada remoto contiene su runtime React para aislar raíces; esto aumenta el tamaño frente a compartir dependencias.
+
+El backend hermano documenta la [puesta en marcha](../ProyectoCertiIA/specs/002-platform-migration/local-development.md), la [arquitectura y límites](../ProyectoCertiIA/specs/002-platform-migration/architecture.md) y la [validación](../ProyectoCertiIA/specs/002-platform-migration/validation.md). Es una migración local en validación; no cambia Render ni traslada datos históricos automáticamente.

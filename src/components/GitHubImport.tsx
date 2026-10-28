@@ -3,9 +3,10 @@ import type { FormEvent } from 'react';
 import { api, message } from '../api/client';
 import type { ImportReady, ImportEvent } from '../types/contracts';
 
-export function GitHubImport({ onReady }: { onReady: (result: ImportReady) => void }) {
+export function GitHubImport({ onReady, onBusyChange }: { onReady: (result: ImportReady) => void; onBusyChange?: (busy: boolean) => void }) {
   const [url, setUrl] = useState('');
   const [pending, setPending] = useState(false);
+  useEffect(() => { onBusyChange?.(pending); return () => onBusyChange?.(false); }, [pending, onBusyChange]);
   const [events, setEvents] = useState<string[]>([]);
   const [result, setResult] = useState<ImportEvent | null>(null);
   const [error, setError] = useState<string | null>(null);

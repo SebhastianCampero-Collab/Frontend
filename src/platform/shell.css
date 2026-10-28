@@ -1,0 +1,13 @@
+.platform-main { flex: 1; min-width: 0; padding: clamp(1rem, 4vw, 4rem); }
+.platform-main header { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 2rem; }
+.platform-auth { max-width: 38rem; margin: 8vh auto; padding: 2rem; }
+.platform-auth form { display: grid; gap: 1rem; margin: 2rem 0; }
+.platform-shell nav { display: grid; gap: .75rem; }
+.platform-shell .sidebar nav button { border: 0; border-radius: 1rem; padding: 1rem; text-align: left; font: inherit; background: transparent; color: inherit; cursor: pointer; transition: background .2s, transform .2s; }
+.platform-shell .sidebar nav button:hover { background: rgb(0 116 228 / 8%); transform: translateX(2px); }
+.platform-shell .sidebar > label { display: flex; align-items: center; gap: .75rem; margin: 1.5rem 0; }
+.platform-shell .sidebar input[type="checkbox"] { width: 1.1rem; height: 1.1rem; margin: 0; accent-color: #0074e4; }
+.remote-frame { border: 0; padding: 0; margin: 2rem 0; min-width: 0; }
+.platform-main select { width: 100%; }
+.platform-shell .sidebar nav button[aria-current="page"] { background: #0074e4; color: white; box-shadow: 0 8px 24px rgb(0 116 228 / 16%); }
+@media(max-width: 800px) { .platform-shell { display: block; } .platform-shell .sidebar { position: static; width: auto; min-height: auto; } }

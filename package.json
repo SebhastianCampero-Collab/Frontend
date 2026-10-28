@@ -7,6 +7,9 @@
     "node": ">=24.15 <25"
   },
   "scripts": {
+    "build:platform": "tsc --noEmit && node scripts/build-platform.mjs",
+    "build:remote": "node scripts/build-platform.mjs",
+    "preview:platform": "vite preview --outDir dist-platform --host 127.0.0.1 --port 5173 --strictPort",
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "typecheck": "tsc --noEmit",
@@ -14,7 +17,9 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "sdd:sync": "node scripts/spec-kit-docs.mjs sync",
+    "sdd:check": "node scripts/spec-kit-docs.mjs check"
   },
   "keywords": [],
   "author": "",

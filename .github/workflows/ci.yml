@@ -26,7 +26,10 @@ jobs:
       - run: npm run check
       - run: npm test
       - run: npm run build
+      - run: npm run build:platform
       - uses: actions/upload-artifact@v4
         with:
           name: frontend-dist
-          path: dist
+          path: |
+            dist
+            dist-platform

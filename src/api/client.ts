@@ -46,14 +46,17 @@ function query(filter: ListFilter): string {
 }
 export class ApiClient {
   private token = '';
+  private tenantId = '';
   private rpcId = 0;
   constructor(public readonly baseUrl = API_URL) {}
   setToken(value: string): void {
     this.token = value.trim();
   }
+  setTenant(value: string): void { this.tenantId = value; }
   async importProject(url: string, onEvent: (event: ImportEvent) => void, signal: AbortSignal): Promise<void> {
     const headers = new Headers({ 'Content-Type': 'application/json', Accept: 'text/event-stream' });
     if (this.token) headers.set('Authorization', `Bearer ${this.token}`);
+    if (this.tenantId) headers.set('X-Tenant-Id', this.tenantId);
     const response = await fetch(`${this.baseUrl}/api/projects/import`, {
       method: 'POST', headers, body: JSON.stringify({ url }),
       signal: AbortSignal.any([signal, AbortSignal.timeout(240000)]),
@@ -102,7 +105,9 @@ export class ApiClient {
         Accept: path === '/api/mcp' ? 'application/json, text/event-stream' : 'application/json',
       });
       if (body !== undefined) headers.set('Content-Type', 'application/json');
+      if (body !== undefined && this.tenantId) headers.set('X-Idempotency-Key', crypto.randomUUID());
       if (this.token) headers.set('Authorization', `Bearer ${this.token}`);
+      if (this.tenantId) headers.set('X-Tenant-Id', this.tenantId);
       const response = await fetch(`${this.baseUrl}${path}`, {
         method: body === undefined ? 'GET' : 'POST',
         headers,
