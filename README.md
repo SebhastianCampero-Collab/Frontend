@@ -1,5 +1,7 @@
 # DevGuardian · Dashboard de operaciones
 
+La cabecera incluye un selector **Claro / Oscuro**. Claro es el tema predeterminado; Oscuro usa superficies grafito y acentos luminosos. La preferencia se guarda en `localStorage` bajo `devguardian.theme`, se restaura antes de pintar la aplicación y se sincroniza entre pestañas. Si el navegador impide guardar preferencias, el selector sigue funcionando durante la visita. Ambos temas comparten el layout, la accesibilidad y los controles de seguridad. La paleta oscura y los colores semánticos compartidos se definen en `src/styles/themes.css`.
+
 **MCP y edición JSON** funciona como un sandbox de peticiones: selector del catálogo real, borrador JSON generado desde los campos requeridos del `inputSchema` y respuesta MCP sin transformar en una segunda columna. Seleccionar una herramienta solo prepara el editor; **Ejecutar petición** envía la llamada. Completa las cadenas vacías con valores reales y consulta el esquema desplegable para los campos opcionales. El `projectId` siempre corresponde al proyecto seleccionado. Los guardrails del backend siguen activos y las herramientas pueden modificar ese workspace: no es una simulación ni un contenedor aislado. Los controles se bloquean durante la petición y cambiar de proyecto limpia el editor y la respuesta.
 
 **Trazas de subagentes** incluye un visor estilo terminal, filtros por rol y exportación JSON de la telemetría visible. Ver [Telemetría de subagentes](TELEMETRIA_SUBAGENTES.md).

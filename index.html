@@ -3,7 +3,13 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/guardian.svg" />
-    <meta name="theme-color" content="#0d1511" />
+    <meta name="theme-color" content="#F9F9F9" />
+    <script>
+      // Apply the saved appearance before the first paint. Light remains the default.
+      try {
+        document.documentElement.dataset.theme = localStorage.getItem('devguardian.theme') === 'dark' ? 'dark' : 'light';
+      } catch { document.documentElement.dataset.theme = 'light'; }
+    </script>
     <meta
       name="description"
       content="DevGuardian: auditoría, reparación verificada y trazabilidad de código con MCP."

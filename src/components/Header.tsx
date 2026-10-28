@@ -1,5 +1,6 @@
 import { Database, RefreshCw, Radio } from 'lucide-react';
 import type { Health } from '../types/contracts';
+import { ThemeSwitcher } from './ThemeSwitcher';
 export function Header({
   health,
   connected,
@@ -17,6 +18,7 @@ export function Header({
         WORKSPACE <span>/</span> DevGuardian <span>/</span> <strong>Control de operaciones</strong>
       </div>
       <div className="header-actions">
+        <ThemeSwitcher />
         <span className={`connection ${connected ? 'online' : ''}`}>
           <Radio size={14} />
           {connected ? 'Backend conectado' : 'Sin conexión'}
