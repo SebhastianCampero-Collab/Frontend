@@ -17,6 +17,7 @@ import { RefreshButton } from './RefreshButton';
 import { CodeInspector } from './CodeInspector';
 import { ResultResponse } from './ResultResponse';
 import { useAdvancedOptions } from './AdvancedOptions';
+import { useServerHealth } from '../hooks/useServerHealth';
 import { Badge, Empty, ErrorNotice, Pagination } from './ui';
 
 export function AuditPanel({
@@ -42,13 +43,15 @@ export function AuditPanel({
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
   const [offset, setOffset] = useState(0);
   const importedProject = project.repoPath.replaceAll('\\', '/').includes('/.devguardian-imports/');
+  const health = useServerHealth();
+  const repairUnavailable = (importedProject || health.data?.capabilities?.requiresIsolation === true) && health.data?.capabilities?.isolatedTests !== true;
   const audit = useAuditRunner(project.id, offset, view === 'results');
   useEffect(() => { onBusyChange?.(audit.pending); return () => onBusyChange?.(false); }, [audit.pending, onBusyChange]);
   const advanced = useAdvancedOptions();
   const files = useProjectFiles(project.id, view !== 'results');
   const [checks, setChecks] = useState<Check[]>(['syntax', 'semantic', 'lint']);
   const [selectedMode, setMode] = useState<'diagnose' | 'repair'>(initialMode);
-  const mode = advanced ? selectedMode : 'diagnose';
+  const mode = advanced && !repairUnavailable ? selectedMode : 'diagnose';
   const previousFile = audit.history.data?.find((item) => auditLabel(item) === 'diagnosed' || item.audit.status === 'committed')?.audit.targetFile;
   const { path, setPath } = useAuditPath(project.id,
     initialRepair?.path ?? initialPath ?? previousFile ?? (project.name.startsWith('Demo Render ') ? 'src/target-bug.ts' : ''),
@@ -134,8 +137,8 @@ export function AuditPanel({
             </button>
             {advanced && <button
               className={mode === 'repair' ? 'active' : ''}
-              disabled={importedProject || audit.pending}
-              title={importedProject ? 'La reparación con pruebas requiere un sandbox para proyectos importados.' : undefined}
+              disabled={repairUnavailable || audit.pending}
+              title={repairUnavailable ? 'La reparación con pruebas requiere un sandbox operativo para proyectos importados.' : undefined}
               onClick={() => setMode('repair')}
             >
               <GitBranch size={15} />
