@@ -2,6 +2,8 @@
 
 **Fixes del equipo:** consultar la [lista única de bugs y pendientes](https://github.com/LuisMI2005-sudo/DevGuardian-SDD-Obsidian/blob/main/CONTROL_DE_FIXES.md) y el [índice #57](https://github.com/LuisMI2005-sudo/ProyectoCertiIA/issues/57). Reclamar el caso antes de editar y entregar HU/issue, pasos, resultado esperado y prueba. No crear una segunda lista local ni duplicar fixes ya asignados.
 
+**Aceptación:** usar el [checklist de los dos incrementos](https://github.com/LuisMI2005-sudo/DevGuardian-SDD-Obsidian/blob/main/CHECKLIST_ACEPTACION_INCREMENTOS.md). Incluye carga de seis remotos, cambio de organización, fallo/reintento y reconstrucción individual de review; no se marca aprobado sin evidencia real.
+
 **Incremento final INC-02:** espacio de trabajo modular con Shell y seis microfrontends (HU-46), integrado con INC-01 de organizaciones y accesos (HU-44). [Definición y aceptación](https://github.com/LuisMI2005-sudo/DevGuardian-SDD-Obsidian/blob/main/specs/006-final-increments/spec.md) y [demostración local](https://github.com/LuisMI2005-sudo/DevGuardian-SDD-Obsidian/blob/main/specs/006-final-increments/demo.md). Usar `build:platform`/`preview:platform`; el arranque legacy no acredita este perfil ni su publicación productiva.
 
 La consolidación en `validate-isolated-repair` combina el botón de recuperación de workspace con la comprobación de aislamiento del servidor. Reclonar conserva el proyecto y refresca su estado; los controles de reparación siguen dependiendo de un sandbox operativo. Esta rama de integración no acredita por sí sola publicación en Render.
