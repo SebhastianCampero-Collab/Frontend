@@ -1,5 +1,7 @@
 # DevGuardian · Dashboard de operaciones
 
+**Incremento final INC-02:** espacio de trabajo modular con Shell y seis microfrontends (HU-46), integrado con INC-01 de organizaciones y accesos (HU-44). [Definición y aceptación](https://github.com/LuisMI2005-sudo/DevGuardian-SDD-Obsidian/blob/main/specs/006-final-increments/spec.md) y [demostración local](https://github.com/LuisMI2005-sudo/DevGuardian-SDD-Obsidian/blob/main/specs/006-final-increments/demo.md). Usar `build:platform`/`preview:platform`; el arranque legacy no acredita este perfil ni su publicación productiva.
+
 La consolidación en `validate-isolated-repair` combina el botón de recuperación de workspace con la comprobación de aislamiento del servidor. Reclonar conserva el proyecto y refresca su estado; los controles de reparación siguen dependiendo de un sandbox operativo. Esta rama de integración no acredita por sí sola publicación en Render.
 
 La reparación consulta la capacidad real del backend: `capabilities.isolatedTests` y `requiresIsolation`. Si el servidor exige aislamiento y no dispone de un runner operativo, los controles de reparación permanecen deshabilitados; el diagnóstico continúa disponible. No basta con instalar Docker CLI ni mostrar un botón para acreditar ejecución segura.
