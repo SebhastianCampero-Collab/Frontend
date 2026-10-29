@@ -8,8 +8,17 @@ export const ProjectSchema = z.object({
   defaultBranch: z.string(),
   runnerType: RunnerSchema,
   createdAt: z.string(),
+  sourceUrl: z.string().optional(),
 });
 export type Project = z.infer<typeof ProjectSchema>;
+export const RecloneResultSchema = z.object({
+  project: ProjectSchema,
+  status: z.enum(['cloned', 'available']),
+  branch: z.string(),
+  headCommit: z.string(),
+  files: z.number().nullable(),
+});
+export type RecloneResult = z.infer<typeof RecloneResultSchema>;
 export const ProjectFilesSchema = z.object({ files: z.array(z.object({ path: z.string(), analyzable: z.boolean() })), truncated: z.boolean() });
 export type ProjectFiles = z.infer<typeof ProjectFilesSchema>;
 export const FileContextSchema = z.object({ path: z.string(), content: z.string(), startLine: z.number(), endLine: z.number(), fileHash: z.string(), truncated: z.boolean() });

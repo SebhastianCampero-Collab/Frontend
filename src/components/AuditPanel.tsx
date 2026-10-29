@@ -16,6 +16,7 @@ import { RepairProgress } from './RepairProgress';
 import { RefreshButton } from './RefreshButton';
 import { CodeInspector } from './CodeInspector';
 import { ResultResponse } from './ResultResponse';
+import { WorkspaceRecovery } from './WorkspaceRecovery';
 import { useAdvancedOptions } from './AdvancedOptions';
 import { useServerHealth } from '../hooks/useServerHealth';
 import { Badge, Empty, ErrorNotice, Pagination } from './ui';
@@ -29,6 +30,7 @@ export function AuditPanel({
   view = 'all',
   onComplete,
   onBusyChange,
+  onWorkspaceRecovered,
 }: {
   project: Project;
   initialRepair?: Repair;
@@ -38,6 +40,7 @@ export function AuditPanel({
   view?: 'review' | 'results' | 'all';
   onComplete?: () => void;
   onBusyChange?: (busy: boolean) => void;
+  onWorkspaceRecovered?: () => void;
 }) {
   const mounted = useRef(true);
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
@@ -49,6 +52,7 @@ export function AuditPanel({
   useEffect(() => { onBusyChange?.(audit.pending); return () => onBusyChange?.(false); }, [audit.pending, onBusyChange]);
   const advanced = useAdvancedOptions();
   const files = useProjectFiles(project.id, view !== 'results');
+  const workspaceUnavailable = files.errorCode === 'WORKSPACE_UNAVAILABLE';
   const [checks, setChecks] = useState<Check[]>(['syntax', 'semantic', 'lint']);
   const [selectedMode, setMode] = useState<'diagnose' | 'repair'>(initialMode);
   const mode = advanced && !repairUnavailable ? selectedMode : 'diagnose';
@@ -109,6 +113,13 @@ export function AuditPanel({
   return (
     <div className="audit-layout" style={view === 'review' ? { gridTemplateColumns: 'minmax(0, 1fr)' } : undefined}>
       <div className="audit-main">
+        {view !== 'results' && workspaceUnavailable && (
+          <WorkspaceRecovery
+            projectId={project.id}
+            detail={files.error}
+            onRecovered={onWorkspaceRecovered ?? (() => files.refresh())}
+          />
+        )}
         {view !== 'results' && <section className="panel">
           <div className="section-heading">
             <div>
@@ -145,8 +156,8 @@ export function AuditPanel({
               Reparación verificada
             </button>}
           </div>
-          <form onSubmit={(event) => void submit(event)}><fieldset className="form-grid action-fields" disabled={audit.pending || audit.selecting}>
-            <FileSelector label={advanced ? 'Archivo del proyecto' : 'Archivo dentro del proyecto'} value={path} onChange={(value) => { setPath(value); setHash(''); }} files={files.data} loading={files.loading} error={files.error} refresh={files.refresh} disabled={audit.pending} sourceOnly />
+          <form onSubmit={(event) => void submit(event)}><fieldset className="form-grid action-fields" disabled={audit.pending || audit.selecting || workspaceUnavailable}>
+            <FileSelector label={advanced ? 'Archivo del proyecto' : 'Archivo dentro del proyecto'} value={path} onChange={(value) => { setPath(value); setHash(''); }} files={files.data} loading={files.loading} error={workspaceUnavailable ? null : files.error} refresh={files.refresh} disabled={audit.pending} sourceOnly />
             {advanced && <label className="wide">
               Archivo dentro del proyecto
               <input
@@ -264,7 +275,7 @@ export function AuditPanel({
             </p>
           )}
         </section>}
-        {view !== 'results' && <FileReader projectId={project.id} files={files.data} loading={files.loading} error={files.error} refresh={files.refresh} disabled={audit.pending} />}
+        {view !== 'results' && <FileReader projectId={project.id} files={files.data} loading={files.loading} error={workspaceUnavailable ? null : files.error} refresh={files.refresh} disabled={audit.pending || workspaceUnavailable} />}
         {view !== 'review' && audit.details && (
           <>
             <ResultResponse key={audit.details.audit.id} details={audit.details} />

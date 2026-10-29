@@ -1,5 +1,7 @@
 # DevGuardian · Dashboard de operaciones
 
+La consolidación en `validate-isolated-repair` combina el botón de recuperación de workspace con la comprobación de aislamiento del servidor. Reclonar conserva el proyecto y refresca su estado; los controles de reparación siguen dependiendo de un sandbox operativo. Esta rama de integración no acredita por sí sola publicación en Render.
+
 La reparación consulta la capacidad real del backend: `capabilities.isolatedTests` y `requiresIsolation`. Si el servidor exige aislamiento y no dispone de un runner operativo, los controles de reparación permanecen deshabilitados; el diagnóstico continúa disponible. No basta con instalar Docker CLI ni mostrar un botón para acreditar ejecución segura.
 
 > **Entrega docente SDD y Obsidian:** consultar el repositorio independiente [DevGuardian-SDD-Obsidian](https://github.com/LuisMI2005-sudo/DevGuardian-SDD-Obsidian), que reúne el SDD del backend y frontend, el segundo cerebro, Mermaid y grafos por colores. Aquí se conserva la aplicación React y su configuración operativa de Spec Kit.

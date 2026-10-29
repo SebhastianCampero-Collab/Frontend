@@ -14,6 +14,7 @@ import {
   DelegationSchema,
   McpToolSchema,
   ProjectSchema,
+  RecloneResultSchema,
   RegisterProjectSchema,
   record,
 } from '../types/contracts';
@@ -177,6 +178,8 @@ export class ApiClient {
   projects = (signal?: AbortSignal) =>
     this.request('/api/projects', z.array(ProjectSchema), undefined, signal);
   projectFiles = (projectId: string, signal?: AbortSignal) => this.request(`/api/projects/${encodeURIComponent(projectId)}/files`, ProjectFilesSchema, undefined, signal);
+  recloneProject = (projectId: string) =>
+    this.request(`/api/projects/${encodeURIComponent(projectId)}/reclone`, RecloneResultSchema, {});
   registerProject = (input: RegisterProject) =>
     this.request('/api/projects', ProjectSchema, RegisterProjectSchema.parse(input));
   prepareDemo = () => this.request('/api/demo/prepare', DemoSetupSchema, {});

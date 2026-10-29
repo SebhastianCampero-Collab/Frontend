@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { message } from '../api/client';
+import { ApiError, message } from '../api/client';
 
 /** Cancels reads and discards obsolete responses when the scope changes or unmounts. */
 export function useResource<T>(
@@ -13,10 +13,11 @@ export function useResource<T>(
     key: string;
     data: T | null;
     error: string | null;
+    errorCode: string | null;
     loading: boolean;
     refreshStatus: 'idle' | 'updating' | 'updated' | 'unchanged' | 'error';
     updatedAt: number | null;
-  }>({ key, data: null, error: null, loading: enabled, refreshStatus: 'idle', updatedAt: null });
+  }>({ key, data: null, error: null, errorCode: null, loading: enabled, refreshStatus: 'idle', updatedAt: null });
   useEffect(() => {
     if (!enabled) return;
     let disposed = false;
@@ -38,6 +39,7 @@ export function useResource<T>(
         key,
         data: previous.key === key ? previous.data : null,
         error: null,
+        errorCode: null,
         loading: true,
         refreshStatus: previous.key === key ? previous.refreshStatus : 'idle',
         updatedAt: previous.key === key ? previous.updatedAt : null,
@@ -49,13 +51,13 @@ export function useResource<T>(
           const unchanged = previous !== undefined && previous === serialized;
           previous = serialized;
           const wasManual = manual;
-          if (!disposed) setState((current) => ({ ...current, key, data, error: null, loading: false,
+          if (!disposed) setState((current) => ({ ...current, key, data, error: null, errorCode: null, loading: false,
             refreshStatus: wasManual ? unchanged ? 'unchanged' : 'updated' : current.refreshStatus,
             updatedAt: wasManual ? Date.now() : current.updatedAt }));
         } catch (error: unknown) {
           const wasManual = manual;
           if (!disposed) setState((current) => ({ ...current, key,
-            data: current.key === key ? current.data : null, error: message(error), loading: false,
+            data: current.key === key ? current.data : null, error: message(error), errorCode: error instanceof ApiError ? error.code : null, loading: false,
             refreshStatus: wasManual ? 'error' : current.refreshStatus }));
         } finally { busy = false; manual = false; }
       })();
@@ -79,7 +81,7 @@ export function useResource<T>(
   const refresh = useCallback(() => { void reload.current(); }, []);
   const reloadNow = useCallback(() => reload.current(), []);
   return {
-    ...(enabled && state.key === key ? state : { key, data: null, error: null, loading: enabled, refreshStatus: 'idle' as const, updatedAt: null }),
+    ...(enabled && state.key === key ? state : { key, data: null, error: null, errorCode: null, loading: enabled, refreshStatus: 'idle' as const, updatedAt: null }),
     refresh,
     reload: reloadNow,
   };

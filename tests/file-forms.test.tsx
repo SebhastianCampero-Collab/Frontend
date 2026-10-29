@@ -1,14 +1,25 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { api } from '../src/api/client';
+import { api, ApiError } from '../src/api/client';
 import { AuditPanel } from '../src/components/AuditPanel';
 import { FileReader } from '../src/components/FileReader';
 import { AdvancedOptions } from '../src/components/AdvancedOptions';
-import { diagnosed, project } from './fixtures';
+import { diagnosed, project, health } from './fixtures';
 
 const files = { files: [{ path: 'src/actual.ts', analyzable: true }, { path: 'README.md', analyzable: false }], truncated: false };
 const reader = <FileReader projectId={project.id} files={files} loading={false} error={null} refresh={vi.fn()} />;
 describe('interactive file tools', () => {
+  it.each([false, true])('uses server isolation capability (%s) for a recovered imported project', async (isolatedTests) => {
+    const checkHealth = vi.spyOn(api, 'health').mockResolvedValue({ ...health, capabilities: { isolatedTests, requiresIsolation: true } });
+    vi.spyOn(api, 'audits').mockResolvedValue([]);
+    vi.spyOn(api, 'projectFiles').mockResolvedValue(files);
+    const run = vi.spyOn(api, 'runAudit');
+    render(<AdvancedOptions.Provider value={true}><AuditPanel project={{ ...project, repoPath: '/workspace/.devguardian-imports/recovered' }} view="review" /></AdvancedOptions.Provider>);
+    await waitFor(() => expect(checkHealth).toHaveBeenCalled());
+    const repair = screen.getByRole('button', { name: 'Reparación verificada' });
+    await waitFor(() => isolatedTests ? expect(repair).toBeEnabled() : expect(repair).toBeDisabled());
+    expect(run).not.toHaveBeenCalled();
+  });
   it('queries the selected real file with numeric lines and renders escaped content', async () => {
     const call = vi.spyOn(api, 'callTool').mockResolvedValue({ data: { path: 'README.md', content: '<script>bad()</script>', startLine: 2, endLine: 5, fileHash: 'a'.repeat(64), truncated: false }, meta: {} });
     render(<AdvancedOptions.Provider value={false}>{reader}</AdvancedOptions.Provider>);
@@ -66,5 +77,18 @@ describe('interactive file tools', () => {
     render(<AdvancedOptions.Provider value={false}><AuditPanel project={project} view="review" /></AdvancedOptions.Provider>);
     await screen.findAllByText('Vuelve a importar el repositorio.');
     expect(screen.getByRole('button', { name: 'Revisar código' })).toBeDisabled();
+  });
+  it('offers to reclone an unavailable workspace without duplicating the project', async () => {
+    vi.spyOn(api, 'audits').mockResolvedValue([]);
+    vi.spyOn(api, 'projectFiles').mockRejectedValue(new ApiError('El workspace no está disponible.', 409, 'WORKSPACE_UNAVAILABLE'));
+    const reclone = vi.spyOn(api, 'recloneProject').mockResolvedValue({ project, status: 'cloned', branch: 'main', headCommit: 'a'.repeat(40), files: 2 });
+    const recovered = vi.fn();
+    render(<AdvancedOptions.Provider value={false}><AuditPanel project={project} view="review" onWorkspaceRecovered={recovered} /></AdvancedOptions.Provider>);
+    const button = await screen.findByRole('button', { name: 'Reclonar Workspace' });
+    expect(screen.getByRole('button', { name: 'Revisar código' })).toBeDisabled();
+    fireEvent.click(button);
+    await waitFor(() => expect(reclone).toHaveBeenCalledWith(project.id));
+    await waitFor(() => expect(recovered).toHaveBeenCalled());
+    expect(screen.getByText(/Workspace restaurado en main/)).toBeInTheDocument();
   });
 });
