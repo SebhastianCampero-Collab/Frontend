@@ -287,6 +287,11 @@ export default function App() {
                   view={route === 'review' ? 'review' : 'results'}
                   onComplete={() => navigate('results')}
                   onBusyChange={setAuditBusy}
+                  onWorkspaceRecovered={() => {
+                    projects.refresh();
+                    health.refresh();
+                    setRevision((value) => value + 1);
+                  }}
                   {...(imported?.project.id === project.id && imported.validation.entryFile ? { initialPath: imported.validation.entryFile } : {})}
                 />
               ) : route === 'hooks' ? (

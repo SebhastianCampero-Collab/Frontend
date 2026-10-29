@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { api } from '../src/api/client';
+import { api, ApiError } from '../src/api/client';
 import { AuditPanel } from '../src/components/AuditPanel';
 import { FileReader } from '../src/components/FileReader';
 import { AdvancedOptions } from '../src/components/AdvancedOptions';
@@ -66,5 +66,18 @@ describe('interactive file tools', () => {
     render(<AdvancedOptions.Provider value={false}><AuditPanel project={project} view="review" /></AdvancedOptions.Provider>);
     await screen.findAllByText('Vuelve a importar el repositorio.');
     expect(screen.getByRole('button', { name: 'Revisar código' })).toBeDisabled();
+  });
+  it('offers to reclone an unavailable workspace without duplicating the project', async () => {
+    vi.spyOn(api, 'audits').mockResolvedValue([]);
+    vi.spyOn(api, 'projectFiles').mockRejectedValue(new ApiError('El workspace no está disponible.', 409, 'WORKSPACE_UNAVAILABLE'));
+    const reclone = vi.spyOn(api, 'recloneProject').mockResolvedValue({ project, status: 'cloned', branch: 'main', headCommit: 'a'.repeat(40), files: 2 });
+    const recovered = vi.fn();
+    render(<AdvancedOptions.Provider value={false}><AuditPanel project={project} view="review" onWorkspaceRecovered={recovered} /></AdvancedOptions.Provider>);
+    const button = await screen.findByRole('button', { name: 'Reclonar Workspace' });
+    expect(screen.getByRole('button', { name: 'Revisar código' })).toBeDisabled();
+    fireEvent.click(button);
+    await waitFor(() => expect(reclone).toHaveBeenCalledWith(project.id));
+    await waitFor(() => expect(recovered).toHaveBeenCalled());
+    expect(screen.getByText(/Workspace restaurado en main/)).toBeInTheDocument();
   });
 });
