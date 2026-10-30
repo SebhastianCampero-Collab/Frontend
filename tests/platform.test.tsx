@@ -25,10 +25,13 @@ describe('multitenant shell and remote contract', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Equipo A · owner' }));
     await waitFor(() => expect(mount).toHaveBeenCalled());
     expect(mount.mock.calls[0]?.[1]).toMatchObject({ tenantId: tenantA, readOnly: false });
+    fireEvent.click(screen.getByRole('button', { name: 'Revisar código' }));
+    await waitFor(() => expect(window.location.hash).toBe('#/review'));
     fireEvent.click(screen.getByRole('button', { name: 'Cambiar organización' }));
     await waitFor(() => expect(handles.unmount).toHaveBeenCalled());
     fireEvent.click(screen.getByRole('button', { name: 'Equipo B · viewer' }));
     await waitFor(() => expect(mount).toHaveBeenLastCalledWith(expect.anything(), expect.objectContaining({ tenantId: tenantB, readOnly: true })));
+    expect(window.location.hash).toBe('#/projects');
     expect(JSON.stringify(localStorage)).not.toContain(session.token);
   });
   it('sends tenant context on JSON and SSE requests, without putting it in the payload', async () => {

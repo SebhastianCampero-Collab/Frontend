@@ -28,7 +28,7 @@ function Workspace({ session, organization, logout, switchTenant }: { session: P
   return <div className="app-shell platform-shell"><aside className="sidebar"><a className="brand" href="#/projects">DevGuardian</a><p>{organization.name}</p><small>{organization.role}</small>
     <nav aria-label="Navegación principal">{navigation.filter(([id]) => advanced || !['hooks', 'agents', 'mcp'].includes(id)).map(([id, label]) => <button key={id} disabled={busy} aria-current={route === id ? 'page' : undefined} onClick={() => navigate(id)}>{label}</button>)}</nav>
     <label><input type="checkbox" checked={advanced} disabled={busy} onChange={event => setAdvanced(event.target.checked)} />Opciones avanzadas</label>
-    <button className="ghost" disabled={busy} onClick={switchTenant}>Cambiar organización</button><button className="ghost" disabled={busy} onClick={() => void logout()}>Cerrar sesión</button>
+    <button className="ghost" disabled={busy} onClick={() => { navigate('projects'); switchTenant(); }}>Cambiar organización</button><button className="ghost" disabled={busy} onClick={() => void logout()}>Cerrar sesión</button>
   </aside><main className="platform-main"><header><h1>{navigation.find(([id]) => id === route)?.[1]}</h1><ThemeSwitcher /></header>
     <label>Proyecto activo<select aria-label="Proyecto activo" value={project?.id ?? ''} disabled={busy} onChange={event => setSelectedId(event.target.value)}>{!visible.length && <option value="">Sin proyectos</option>}{visible.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
     {projects.error && <p role="alert">{projects.error}</p>}
