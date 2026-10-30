@@ -49,6 +49,7 @@ export const HealthSchema = z.object({
   version: z.string(),
   uptimeSeconds: z.number(),
   runners: z.array(z.object({ runner: z.string(), available: z.boolean() })),
+  capabilities: z.object({ isolatedTests: z.boolean(), requiresIsolation: z.boolean().optional() }).optional(),
 });
 export type Health = z.infer<typeof HealthSchema>;
 export const DiagnosticSchema = z.object({
